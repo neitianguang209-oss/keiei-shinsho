@@ -1,0 +1,2036 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="数字で会社を読む">
+<meta name="theme-color" content="#f4f1ea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1b1a18" media="(prefers-color-scheme: dark)">
+<title>数字で会社を読む</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>
+/* 縦書きの電子書籍。紙は生成りではなく少し灰みの「帳簿紙」、差し色は罫線の深緑と締切線の朱。
+   フォントは端末内蔵の明朝(オフラインでも同じ見た目になるよう、ウェブフォントは使わない) */
+:root{
+  --paper:#f3f2ec; --ink:#24231f; --ink-soft:#6b6a62; --rule:#d7d5ca;
+  --accent:#2f5d50; --accent-soft:#e1eae5; --shu:#b4483a; --box:#fbfaf6; --mark:#f5e7b2;
+  --mincho:"Hiragino Mincho ProN","Hiragino Mincho Pro","Yu Mincho","YuMincho","Noto Serif JP","MS PMincho",serif;
+  --gothic:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic","YuGothic","Noto Sans JP","Meiryo",sans-serif;
+  --fs:18px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#1b1a18; --ink:#e3e0d6; --ink-soft:#a19d91; --rule:#3a3833;
+  --accent:#8fc2ad; --accent-soft:#25302b; --shu:#e48b7c; --box:#22211e; --mark:#4d4321; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#1b1a18; --ink:#e3e0d6; --ink-soft:#a19d91; --rule:#3a3833;
+  --accent:#8fc2ad; --accent-soft:#25302b; --shu:#e48b7c; --box:#22211e; --mark:#4d4321; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--mincho);-webkit-text-size-adjust:100%;overflow:hidden;
+  -webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit}
+[hidden]{display:none!important}
+
+/* ===== 表紙と目次(横書き) ===== */
+#home{position:fixed;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:calc(env(safe-area-inset-top) + 20px) max(20px,env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 40px) max(20px,env(safe-area-inset-left))}
+.home-inner{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:28px}
+.cover{display:flex;flex-direction:row-reverse;gap:18px;align-items:stretch;border:1px solid var(--rule);background:var(--box);padding:28px 22px;min-height:300px;position:relative}
+.cover .band{position:absolute;left:0;right:0;bottom:0;height:10px;background:var(--accent)}
+.cover-title{writing-mode:vertical-rl;font-size:36px;font-weight:600;letter-spacing:.12em;line-height:1.2}
+.cover-sub{writing-mode:vertical-rl;font-size:15px;color:var(--ink-soft);letter-spacing:.08em}
+.cover-meta{margin-right:auto;align-self:flex-end;font-family:var(--gothic);font-size:12px;color:var(--ink-soft);line-height:1.8}
+.resume{display:flex;flex-direction:column;gap:6px;border:1px solid var(--accent);background:var(--accent-soft);padding:16px 18px;text-align:left;cursor:pointer;border-radius:2px}
+.resume .k{font-family:var(--gothic);font-size:12px;color:var(--accent);letter-spacing:.05em}
+.resume .t{font-size:19px;font-weight:600}
+.resume .s{font-family:var(--gothic);font-size:12px;color:var(--ink-soft)}
+.bar{height:4px;background:var(--rule);border-radius:2px;overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--accent);width:0}
+.overall{font-family:var(--gothic);font-size:12px;color:var(--ink-soft);display:flex;flex-direction:column;gap:6px}
+.toc-h{font-size:15px;font-family:var(--gothic);color:var(--ink-soft);letter-spacing:.1em;margin:0 0 4px}
+.toc{list-style:none;margin:0;padding:0;border-top:1px solid var(--rule)}
+.toc>li{border-bottom:1px solid var(--rule)}
+.toc-row{display:grid;grid-template-columns:3.6em 1fr auto;gap:10px;align-items:center;width:100%;padding:14px 2px;background:none;border:0;text-align:left;cursor:pointer}
+.toc-row .no{font-family:var(--gothic);font-size:12px;color:var(--ink-soft)}
+.toc-row .tt{font-size:17px;line-height:1.5}
+.toc-row .tt small{display:block;font-family:var(--gothic);font-size:11px;color:var(--ink-soft);margin-top:2px}
+.state{font-family:var(--gothic);font-size:11px;padding:2px 8px;border-radius:10px;white-space:nowrap;border:1px solid var(--rule);color:var(--ink-soft)}
+.state.reading{border-color:var(--accent);color:var(--accent)}
+.state.done{background:var(--accent);border-color:var(--accent);color:var(--paper)}
+.secs{list-style:none;margin:0 0 12px 3.6em;padding:0;display:flex;flex-direction:column;gap:2px}
+.secs button{display:flex;gap:8px;align-items:baseline;background:none;border:0;padding:5px 0;text-align:left;cursor:pointer;font-size:14px;color:var(--ink-soft)}
+.secs .dot{width:8px;height:8px;border-radius:50%;border:1px solid var(--ink-soft);flex:none;transform:translateY(-1px)}
+.secs .read .dot{background:var(--accent);border-color:var(--accent)}
+.secs .read{color:var(--ink)}
+.sync{font-family:var(--gothic);font-size:11px;color:var(--ink-soft);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.sync .led{width:7px;height:7px;border-radius:50%;background:var(--ink-soft)}
+.sync.ok .led{background:var(--accent)} .sync.off .led{background:var(--shu)}
+.tools{display:flex;gap:8px;flex-wrap:wrap;font-family:var(--gothic);font-size:12px}
+.tools button{border:1px solid var(--rule);background:var(--box);padding:6px 12px;border-radius:2px;cursor:pointer}
+
+/* ===== 読書画面(縦書き) ===== */
+#reader{position:fixed;inset:0;display:flex;flex-direction:column}
+#page{flex:1;min-height:0;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;
+  writing-mode:vertical-rl;font-size:var(--fs);line-height:1.85;
+  padding:calc(env(safe-area-inset-top) + 34px) max(22px,env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 30px) max(22px,env(safe-area-inset-left));
+  text-align:justify;font-feature-settings:"palt" 0;scrollbar-width:none;overscroll-behavior-x:contain}
+#page::-webkit-scrollbar{display:none}
+#page .chapter{display:block}
+#page p{margin:0;text-indent:1em}
+#page p+p{margin-block-start:0}
+#page h2.ch-title{font-size:1.55em;font-weight:600;letter-spacing:.06em;margin:0 0 0 2.2em;padding:0;line-height:1.45}
+#page .ch-no{display:block;font-size:.55em;color:var(--accent);font-family:var(--gothic);letter-spacing:.2em;margin-bottom:.8em}
+#page h3{font-size:1.12em;font-weight:600;margin:0 2.4em 0 1.1em;padding-block-start:3em;line-height:1.5;border-inline-start:0}
+#page h3::before{content:"";display:block;width:2.2em;border-left:0;border-top:2px solid var(--accent);margin-bottom:1em;writing-mode:horizontal-tb;height:0}
+#page .lead{font-size:1.05em;text-indent:0;margin:0 0 0 2.4em;padding-block-start:4em;color:var(--ink);line-height:2}
+#page b{font-weight:600;background:linear-gradient(to left,transparent 60%,var(--mark) 60%)}
+#page ul,#page ol{margin:0;padding-block-start:1.2em;padding-inline-start:1.4em}
+#page li{margin-left:.35em}
+.tcy{text-combine-upright:all;-webkit-text-combine:horizontal}
+.tag{font-family:var(--gothic);font-size:.62em;border:1px solid currentColor;padding:.1em .15em;margin:0 .15em;border-radius:2px;letter-spacing:0;text-indent:0;vertical-align:baseline;color:var(--shu)}
+.tag-講義{color:var(--accent)}
+/* 横書きの差し込み(図・表・公式) */
+#page .yoko{writing-mode:horizontal-tb;width:min(84vw,560px);max-height:100%;overflow-y:auto;margin:0 1.4em;padding:14px 16px;
+  font-size:max(13px,calc(var(--fs) * .78));line-height:1.7;background:var(--box);border:1px solid var(--rule);text-indent:0;text-align:left;
+  display:block;align-self:center}
+#page figure.yoko{padding:12px}
+#page .yoko svg{width:100%;height:auto;display:block;max-height:58vh}
+#page .yoko figcaption,#page .yoko .cap{font-family:var(--gothic);font-size:11px;color:var(--ink-soft);margin-top:8px;line-height:1.6;text-indent:0}
+#page .yoko p{text-indent:0;margin:0 0 .4em}
+#page .yoko .box-h{font-family:var(--gothic);font-weight:700;font-size:12px;color:var(--accent);margin-bottom:8px}
+#page .yoko .f{font-family:var(--gothic);font-size:1em;padding:6px 0;border-bottom:1px dotted var(--rule)}
+#page .yoko table{border-collapse:collapse;width:100%;font-family:var(--gothic);font-size:.92em;font-variant-numeric:tabular-nums}
+#page .yoko th,#page .yoko td{border:1px solid var(--rule);padding:5px 7px;vertical-align:top;text-align:left}
+#page .yoko th{background:var(--accent-soft)}
+#page .yoko td.n{text-align:right;white-space:nowrap}
+#page .yoko td.nw{white-space:nowrap}
+#page .yoko tr.sum td{font-weight:700;border-top:2px solid var(--ink)}
+#page .yoko .pl{color:var(--accent);font-weight:700;text-align:center} #page .yoko .mi{color:var(--shu);font-weight:700;text-align:center}
+#page .yoko b{background:none}
+#page .yoko.calc{border-left:3px double var(--accent)}
+/* 図(SVG)の部品。どの図も同じ色・線・文字で描く */
+svg text{font-family:var(--gothic)}
+svg .t{font-size:13px;fill:var(--ink)} svg .t-h{font-size:13px;font-weight:700;fill:var(--ink)} svg .t-s{font-size:11px;fill:var(--ink)}
+svg .f-a{fill:var(--accent-soft);stroke:var(--accent)} svg .f-b{fill:color-mix(in srgb,var(--shu) 22%,var(--box));stroke:var(--shu)}
+svg .f-c{fill:var(--mark);stroke:color-mix(in srgb,var(--ink) 35%,var(--mark))} svg .f-box{fill:var(--box);stroke:var(--rule)}
+svg .ln line,svg line.ln{stroke:var(--ink-soft);stroke-width:1.2} svg .ax{stroke:var(--ink);stroke-width:1.2}
+svg .arc{fill:none;stroke:var(--ink-soft);stroke-dasharray:4 3} svg .dash{stroke:var(--ink-soft);stroke-dasharray:5 4;fill:none}
+svg .acc{stroke:var(--accent);fill:none;stroke-width:2.5} svg .shu{stroke:var(--shu);fill:none;stroke-width:2.5}
+#page .aside{margin:0 1.6em;padding:1.2em .9em;background:var(--accent-soft);font-size:.92em}
+#page .aside-h{font-weight:600;text-indent:0;margin-bottom:.6em}
+#page .lecture{margin:0 1.2em;padding:1em .7em;border-right:3px solid var(--accent);font-size:.96em}
+/* 章末 */
+#page .end{margin:0 3em 0 1em;padding:2.5em 1.1em 0;border-right:4px double var(--shu);font-size:.95em}
+#page .end-h{font-family:var(--gothic);font-size:.72em;color:var(--shu);letter-spacing:.15em;text-indent:0;margin:0 0 .6em 1em}
+#page .end ol{margin:0 0 0 1.4em;padding-block-start:0}
+#page .kw{font-size:.88em;text-indent:0;margin:0 0 0 1.4em;color:var(--ink-soft);line-height:1.9}
+#page .checks{margin:0 0 0 1.4em;display:flex;flex-direction:column;gap:.6em}
+#page .chk{display:flex;gap:.5em;align-items:flex-start;cursor:pointer;font-size:.9em;text-indent:0}
+#page .chk input{writing-mode:horizontal-tb;width:1.1em;height:1.1em;accent-color:var(--accent);margin:0}
+#page .done-btn{writing-mode:horizontal-tb;font-family:var(--gothic);font-size:13px;margin:0 2em;align-self:center;padding:12px 18px;border:1px solid var(--accent);background:var(--accent);color:var(--paper);border-radius:2px;cursor:pointer}
+#page .next-btn{writing-mode:horizontal-tb;font-family:var(--gothic);font-size:13px;margin:0 1em 0 3em;align-self:center;padding:12px 18px;border:1px solid var(--accent);background:none;color:var(--accent);border-radius:2px;cursor:pointer}
+#page .tail{display:flex;flex-direction:column;justify-content:center;gap:16px;padding:0 1em}
+/* 巻末の練習(答えを開く) */
+#page .yoko details.ans{margin-top:8px;border-top:1px dotted var(--rule);padding-top:6px}
+#page .yoko details.ans summary{cursor:pointer;font-family:var(--gothic);font-size:12px;color:var(--accent);display:inline-block;border:1px solid var(--accent);padding:2px 10px;border-radius:2px;list-style:none}
+#page .yoko details.ans summary::-webkit-details-marker{display:none}
+#page .yoko details.ans[open] summary{background:var(--accent);color:var(--paper)}
+#page .yoko details.ans p{margin-top:8px}
+#page details.q{margin:0 .8em;padding:.8em .4em;border-right:1px solid var(--rule)}
+#page details.q summary{list-style:none;cursor:pointer;font-family:var(--gothic);font-size:.75em;color:var(--accent);text-indent:0}
+#page details.q summary::-webkit-details-marker{display:none}
+
+/* 読書中の上下の帯(タップで出す) */
+.chrome{position:fixed;left:0;right:0;z-index:5;background:color-mix(in srgb,var(--paper) 94%,transparent);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  font-family:var(--gothic);font-size:13px;transition:opacity .2s,transform .2s}
+.chrome.top{top:0;padding:calc(env(safe-area-inset-top) + 8px) max(14px,env(safe-area-inset-right)) 8px max(14px,env(safe-area-inset-left));display:flex;gap:10px;align-items:center;border-bottom:1px solid var(--rule)}
+.chrome.bottom{bottom:0;padding:10px max(16px,env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 10px) max(16px,env(safe-area-inset-left));border-top:1px solid var(--rule);display:flex;flex-direction:column;gap:8px}
+.chrome .ttl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
+.chrome button{background:none;border:1px solid var(--rule);border-radius:2px;padding:6px 10px;cursor:pointer;min-height:36px}
+.chrome .row{display:flex;gap:10px;align-items:center;justify-content:space-between}
+.chrome input[type=range]{flex:1;direction:rtl;accent-color:var(--accent)}
+body.reading-calm .chrome{opacity:0;pointer-events:none}
+body.reading-calm .chrome.top{transform:translateY(-100%)} body.reading-calm .chrome.bottom{transform:translateY(100%)}
+/* 左右の余白に紙色の帯を重ねて、余白にかかった行を隠す */
+.gut{position:fixed;top:0;bottom:0;z-index:2;pointer-events:none;background:var(--paper)}
+.gut.l{left:0;width:max(22px,env(safe-area-inset-left))} .gut.r{right:0;width:max(22px,env(safe-area-inset-right))}
+.runhead{position:fixed;top:calc(env(safe-area-inset-top) + 8px);left:0;right:0;text-align:center;font-family:var(--gothic);font-size:10px;color:var(--ink-soft);pointer-events:none;letter-spacing:.1em}
+.folio{position:fixed;bottom:calc(env(safe-area-inset-bottom) + 6px);left:0;right:0;text-align:center;font-family:var(--gothic);font-size:10px;color:var(--ink-soft);pointer-events:none;font-variant-numeric:tabular-nums}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 70px);background:var(--ink);color:var(--paper);font-family:var(--gothic);font-size:13px;padding:10px 16px;border-radius:20px;z-index:9;max-width:90vw;display:flex;gap:12px;align-items:center}
+.toast button{background:none;border:1px solid currentColor;color:inherit;border-radius:14px;padding:4px 10px;cursor:pointer}
+@media (max-width:520px){ #page .yoko table{font-size:.8em} #page .yoko th,#page .yoko td{padding:4px 5px} #page .yoko{padding:12px 10px} }
+@media (min-width:700px){ :root{--fs:20px} .cover-title{font-size:44px} }
+@media (min-width:1000px) and (min-height:700px){ :root{--fs:21px} }
+@media (prefers-reduced-motion:reduce){ .chrome{transition:none} }
+</style>
+</head>
+<body>
+
+<!-- 表紙・目次 -->
+<div id="home">
+<div class="home-inner">
+  <div class="cover">
+    <div class="cover-title">数字で会社を読む</div>
+    <div class="cover-sub">経営分析論Ⅱ　中間テストのための新書</div>
+    <div class="cover-meta">教科書 第1・7・9・10・13章<br>講義 第3回〜第7回<br>中間テスト 11月11日(水)2限</div>
+    <div class="band"></div>
+  </div>
+  <button class="resume" id="resume" hidden></button>
+  <div class="overall"><div class="bar"><i id="allbar"></i></div><span id="alltxt"></span></div>
+  <section>
+    <h2 class="toc-h">目次</h2>
+    <ul class="toc" id="toc"></ul>
+  </section>
+  <div class="sync" id="sync"><span class="led"></span><span id="synctxt">同期の準備中</span></div>
+  <div class="tools">
+    <button id="fsminus" aria-label="文字を小さく">文字 小</button>
+    <button id="fsplus" aria-label="文字を大きく">文字 大</button>
+    <button id="theme">表示:端末に合わせる</button>
+  </div>
+</div>
+</div>
+
+<!-- 読書画面 -->
+<div id="reader" hidden>
+  <div class="runhead" id="runhead"></div>
+  <div id="page" tabindex="0" aria-live="off"></div>
+  <div class="gut l" aria-hidden="true"></div><div class="gut r" aria-hidden="true"></div>
+  <div class="folio" id="folio"></div>
+  <div class="chrome top">
+    <button id="back">目次</button>
+    <div class="ttl" id="ttl"></div>
+    <button id="markdone">読了にする</button>
+  </div>
+  <div class="chrome bottom">
+    <div class="row"><span id="pct">0%</span><input type="range" id="seek" min="0" max="1000" value="0" aria-label="章の中の位置"><span id="chpos"></span></div>
+    <div class="row"><button id="prevch">前の章</button><button id="rfsminus">文字 小</button><button id="rfsplus">文字 大</button><button id="nextch">次の章</button></div>
+  </div>
+</div>
+
+<div id="book" hidden>
+<section class="chapter" id="prologue" data-title="数字は会社の言葉" data-src="この本の読み方">
+<h2 class="ch-title"><span class="ch-no">序章</span>数字は会社の言葉</h2>
+
+<p class="lead">一冊の決算書には、会社の一年がまるごと書き込まれている。ただし、それは数字という言葉で書かれている。この本は、その言葉を読めるようになるための本である。</p>
+
+<h3 id="pr-1">この本で旅すること</h3>
+<p>経営分析と聞くと、電卓を叩いて比率を出す、乾いた作業を思い浮かべるかもしれません。けれど実際に数字を読みはじめると、そこには驚くほど人間くさい話が詰まっています。</p>
+<p>黒字なのに倒産する会社がある。去年大きく伸びた会社が、今年は平凡になる。売上が大きい会社ほど価値を生んでいるとは限らない。株主のお金にも値段がある。そして、経営者は決算書の利益を、ある程度「つくる」ことができる。</p>
+<p>この本は、経営分析論Ⅱの講義の第三回から第七回まで、教科書でいえば第一・七・九・十・十三章の内容を、一冊の読み物として組み立て直したものです。もとにしたのは、授業のスライドと、オンライン回(第五〜七回)の講義動画です。動画の中で先生が口頭で補足したことは本文に溶かし込み、<span class="tag tag-講義">講義</span>の印をつけました。</p>
+
+<h3 id="pr-2">三つのものさし</h3>
+<p>先に、全体の地図を渡しておきます。この本を通して、会社を測るものさしは三本しか出てきません。</p>
+<p>一本めは<b>利益</b>です。損益計算書に書かれた、一年間のもうけです。もっともよく使われるものさしですが、経営者の判断や見積もりが入る「意見」でもあります。</p>
+<p>二本めは<b>お金</b>(キャッシュ)です。実際に口座に入り、出ていった現金です。こちらは「事実」なので、ごまかしにくい。利益とお金のズレを読むことが、会社を読むことの半分を占めます。</p>
+<p>三本めは<b>価値</b>です。会社が新しく生み出したもの(付加価値)と、お金を集めるためにかかったコスト(資本コスト)を差し引いて、本当に価値を生んだかどうかを測ります。</p>
+
+<figure class="yoko" id="fig0">
+<svg viewBox="0 0 460 210" role="img" aria-label="この本の章立てと三つのものさしの関係">
+<rect x="10" y="20" width="135" height="44" class="f-c"/><text x="77" y="47" class="t-h" text-anchor="middle">利益(意見)</text>
+<rect x="162" y="20" width="135" height="44" class="f-a"/><text x="229" y="47" class="t-h" text-anchor="middle">お金(事実)</text>
+<rect x="314" y="20" width="135" height="44" class="f-b"/><text x="381" y="47" class="t-h" text-anchor="middle">価値</text>
+<g class="t-s" text-anchor="middle">
+<text x="229" y="88">第二章 黒字なのにお金がない</text><text x="229" y="104">第三章 自由に使えるお金</text>
+<text x="77" y="88">第四章 伸び続けるか</text><text x="77" y="104">(利益と資本の成長)</text>
+<text x="381" y="88">第五章 何を生み出したか</text><text x="381" y="104">第六章 お金にも値段がある</text>
+</g>
+<rect x="60" y="128" width="340" height="30" class="f-box"/><text x="230" y="148" class="t-s" text-anchor="middle">第七章 利益はつくれる(利益をお金で確かめる)</text>
+<rect x="60" y="170" width="340" height="30" class="f-box"/><text x="230" y="190" class="t-s" text-anchor="middle">第一章 だれが、何のために数字を読むのか(すべての土台)</text>
+</svg>
+<figcaption>図0　この本の地図。三つのものさしと各章の関係[新規作図]</figcaption>
+</figure>
+
+<p>章の並びは、授業の回の順ではありません。第一章で「なぜ数字を読むのか」を押さえたら、第二・三章で利益とお金のズレに分け入り、第四章で時間の軸を伸ばし、第五・六章で価値とコストを測り、最後の第七章で、それまで使ってきた利益そのものを疑います。一つの疑問が次の疑問を呼ぶように並べたので、できれば頭から順に読んでください。</p>
+
+<h3 id="pr-4">いつも手元に置いておく三つの問い</h3>
+<p>どの章を読んでいるときも、次の三つの問いを頭の隅に置いておくと、新しい指標や用語に出会っても迷いません。</p>
+<p>一つめは、<b>だれが読むのか</b>。株主か、銀行か、従業員か。同じ数字でも、読む人の立場によって意味が変わります。第一章のテーマであり、すべての章の土台です。</p>
+<p>二つめは、<b>何と比べるのか</b>。去年の自分か、ライバルか、計画か、それともお金を集めるのにかかったコストか。経営分析の指標は、どれも何かと比べるための道具です。比べる相手を間違えると、正しい計算をしても結論を誤ります。</p>
+<p>三つめは、<b>それは利益なのか、お金なのか</b>。いま見ている数字は、経営者の判断が入った「意見」なのか、口座の残高のような「事実」なのか。この区別ができると、決算書のどこを信じ、どこを疑えばよいかが見えてきます。</p>
+<p>試験でも、多くの問いはこの三つのどれかに言い換えられます。迷ったら、この三つに戻ってきてください。</p>
+
+<h3 id="pr-3">読み方と、試験のこと</h3>
+<p>中間テストは<b>十一月十一日(水)の二限</b>、<b>持ち込み不可</b>で、<b>電卓</b>が要ります。範囲は講義の第三回から第七回まで。ただし「第三回で説明していない部分は除く」とされています。第三回は動画がないため、この本ではスライドの内容をすべて扱い、範囲外かもしれない部分には<span class="tag tag-要確認">要確認</span>の印をつけました。資料に書かれていないことを補った部分には<span class="tag tag-補足">補足</span>の印があります。</p>
+<p>計算は本文では「考え方」だけを示し、式と数字は横書きの箱に入れました。手順を追った練習は、巻末にまとめてあります。各章の終わりには、その章の核心が三つ、キーワード、そして記述問題として問われそうな問いが置いてあります。</p>
+<p>一つだけ、正直なことを書いておきます。読み物は理解には強いのですが、記憶の定着には弱いものです。すらすら読めたことと、試験で思い出せることは別の力です。章を読み終えたら、核心の三行を見て、本を閉じ、自分の言葉で説明してみてください。章末のチェック欄は、そのためにあります。</p>
+<p>ページは、画面の左側を軽く叩くか、指で右へ送ると進みます。真ん中を叩くと、目次や文字の大きさの操作が出てきます。どこまで読んだかは、iPhoneとiPadのどちらで読んでも、自動でつながります。</p>
+<p>では、最初の問いから始めましょう。同じ決算書を読んでいるのに、なぜ人によって目に留まる場所が違うのか。</p>
+</section>
+
+<section class="chapter" id="ch1" data-title="だれが、何のために数字を読むのか" data-src="第4回・教科書第1章">
+<h2 class="ch-title"><span class="ch-no">第一章</span>だれが、何のために数字を読むのか</h2>
+
+<p class="lead">同じ一冊の決算書を、株主と銀行と、そこで働く社員が読んでいる。三人は同じ数字を見ているのに、目に留まる場所がまるで違う。なぜだろうか。</p>
+
+<h3 id="ch1-1">数字は会社の言葉</h3>
+<p>会社は毎年、自分の一年を数字で書き残します。それが財務諸表です。決算書と呼ばれることもあります。教科書は、財務諸表のデータを「ビジネスの言語」と呼んでいます。会社の外にいる人が、中で何が起きているのかを知るための、いちばん大事な情報源だからです。</p>
+<p>言葉である以上、まずは文法を覚えなければなりません。財務諸表の中心は二枚の書類です。</p>
+<p>一枚目は<b>貸借対照表</b>です。英語の頭文字でＢ／Ｓとも書きます。これは、決算の日という一瞬を切り取った「写真」のようなものです。右側には、会社がお金をどこから集めたかが書いてあります。銀行から借りたお金や社債のように、いつか返さなければならないお金が<b>負債</b>、株主が出したお金やこれまでに稼いでためたお金のように返さなくてよいお金が<b>純資産</b>です。左側には、そのお金をいま何の形で持っているかが書いてあります。現金、売掛金、商品、建物、機械、土地。これが<b>資産</b>です。</p>
+<p>集めたお金は、必ず何かの形でどこかにあります。だから左と右の合計は、いつもぴたりと一致します。</p>
+
+<figure class="yoko" id="fig2">
+<svg viewBox="0 0 440 210" role="img" aria-label="貸借対照表と損益計算書の形">
+<text x="105" y="18" class="t-h" text-anchor="middle">Ｂ／Ｓ(期末時点)</text>
+<rect x="20" y="28" width="85" height="160" class="f-a"/><text x="62" y="112" class="t" text-anchor="middle">資産</text>
+<rect x="105" y="28" width="85" height="70" class="f-b"/><text x="147" y="68" class="t" text-anchor="middle">負債</text>
+<rect x="105" y="98" width="85" height="90" class="f-c"/><text x="147" y="148" class="t" text-anchor="middle">純資産</text>
+<text x="330" y="18" class="t-h" text-anchor="middle">Ｐ／Ｌ(１会計期間)</text>
+<rect x="245" y="28" width="85" height="120" class="f-b"/><text x="287" y="92" class="t" text-anchor="middle">費用</text>
+<rect x="245" y="148" width="85" height="40" class="f-c"/><text x="287" y="173" class="t" text-anchor="middle">利益</text>
+<rect x="330" y="28" width="85" height="160" class="f-a"/><text x="372" y="112" class="t" text-anchor="middle">収益</text>
+</svg>
+<figcaption>図2　財務諸表の情報。Ｂ／Ｓは期末という一時点、Ｐ／Ｌは一会計期間を表す(第4回スライドより)</figcaption>
+</figure>
+
+<p>二枚目は<b>損益計算書</b>、Ｐ／Ｌです。こちらは一年間という時間の流れを記録した「動画」です。一年間に入ってきた<b>収益</b>から、かかった<b>費用</b>を引いて、残ったものが<b>利益</b>です。</p>
+<p>ただし、損益計算書の利益は一つではありません。上から順に引き算をしていくと、性格の違う五つの利益が次々に顔を出します。</p>
+
+<div class="yoko box">
+<p class="box-h">損益計算書の五つの利益</p>
+<table>
+<tr><td>売上高 － 売上原価</td><td>＝ ①売上総利益</td><td>いわゆる粗利</td></tr>
+<tr><td>－ 販売費及び一般管理費</td><td>＝ ②営業利益</td><td>本業のもうけ</td></tr>
+<tr><td>＋ 営業外収益 － 営業外費用</td><td>＝ ③経常利益</td><td>ふだんの実力</td></tr>
+<tr><td>＋ 特別利益 － 特別損失</td><td>＝ ④税金等調整前当期純利益</td><td>臨時の損得まで含む</td></tr>
+<tr><td>－ 法人税等</td><td>＝ ⑤当期純利益</td><td>最後に残るもうけ</td></tr>
+</table>
+</div>
+
+<p>たとえば、ある会社の営業利益が大きく伸びたのに、当期純利益は減っていたとします。本業は好調なのに、工場の火事のような臨時の損失(特別損失)が出たのかもしれません。どの段で数字が動いたかを見るだけで、会社に何が起きたかの見当がつきます。四番目の「税金等調整前当期純利益」は、次の章でお金の流れを計算するときの出発点になるので、名前だけでも覚えておいてください。</p>
+
+<h3 id="ch1-2">会社は「契約の束」でできている</h3>
+<p>では、この言葉をだれが読むのでしょうか。教科書は、財務データの使い方は<b>利害関係者</b>によって異なると言います。利害関係者とは、会社と利害でつながっている人たちのことで、ステークホルダーとも呼ばれます。株主、債権者(お金を貸している銀行など)、顧客、納入業者、監査人、政府、従業員、そして経営者です。</p>
+<p>一つの会社のまわりに、どんな人がどうつながっているかを描くと、次のようになります。</p>
+
+<figure class="yoko" id="fig1">
+<svg viewBox="0 0 460 300" role="img" aria-label="企業と利害関係者の間のお金と物の流れ">
+<rect x="185" y="125" width="90" height="46" rx="4" class="f-a"/><text x="230" y="153" class="t-h" text-anchor="middle">企業</text>
+<text x="160" y="28" class="t-h" text-anchor="middle">顧客</text><text x="300" y="28" class="t-h" text-anchor="middle">株主</text>
+<text x="420" y="110" class="t-h" text-anchor="middle">債権者</text><text x="420" y="225" class="t-h" text-anchor="middle">従業員</text>
+<text x="45" y="110" class="t-h" text-anchor="middle">政府など</text><text x="45" y="200" class="t-h" text-anchor="middle">仕入先</text>
+<text x="230" y="285" class="t-h" text-anchor="middle">経営管理者</text>
+<g class="ln">
+<line x1="205" y1="125" x2="165" y2="36"/><line x1="255" y1="125" x2="295" y2="36"/>
+<line x1="275" y1="140" x2="390" y2="112"/><line x1="275" y1="160" x2="390" y2="218"/>
+<line x1="185" y1="140" x2="75" y2="112"/><line x1="185" y1="160" x2="75" y2="196"/>
+<line x1="230" y1="171" x2="230" y2="270"/>
+</g>
+<text x="160" y="80" class="t-s" text-anchor="end">製品 ／ 代金</text>
+<text x="300" y="80" class="t-s">投資 ／ 配当</text>
+<text x="335" y="118" class="t-s">融資 ／ 利子</text>
+<text x="335" y="205" class="t-s">労働 ／ 給与</text>
+<text x="128" y="118" class="t-s" text-anchor="end">税金 ／ 公共支出</text>
+<text x="128" y="190" class="t-s" text-anchor="end">原材料 ／ 代金</text>
+<text x="238" y="225" class="t-s">管理 ／ 報酬</text>
+</svg>
+<figcaption>図1　企業環境。会社は、まわりの人たちとお金や物をやりとりしている(第4回スライド「企業環境」を再構成)</figcaption>
+</figure>
+
+<p>図を眺めると、どの線も「何かを出して、何かを受け取る」約束になっていることに気づきます。株主はお金を出して配当を受け取り、銀行はお金を貸して利子を受け取ります。従業員は働いて給与を、仕入先は原材料を納めて代金を受け取ります。</p>
+<p>そう考えると、会社とは建物や機械のことではなく、たくさんの約束が結び合わさったものだと見えてきます。教科書はこれを、企業はさまざまな利害関係者との間の<b>「契約の集合体」</b>だと表現しています。財務諸表は、その一つひとつの約束がきちんと守られそうか、守られたかを確かめるための共通の記録なのです。</p>
+
+<h3 id="ch1-3">契約を結ぶ前と、結んだあと</h3>
+<p>約束には、結ぶ前と結んだあとがあります。財務諸表の使い道も、この二つの場面で分かれます。</p>
+<p>結ぶ<b>前</b>の場面では、「この相手と約束してよいか」を決めるために数字を読みます。投資家は、この会社にお金を投じるべきかを考えます。銀行は、お金を貸すべきかを考えます。納入業者は材料を納めてよいか、学生はこの会社に就職してよいかを考えます。これを<b>意思決定支援機能</b>といいます。就職活動で企業の決算書を眺めるのも、立派な財務諸表分析です。</p>
+<p>結んだ<b>あと</b>の場面では、「約束が守られているか」を見張るために読みます。株主は、株価が上がるか、配当がもらえるかを気にします。債権者は、貸したお金と利息を回収できるかを気にします。納入業者は掛けで売った代金の回収を、従業員は給与や賞与を気にします。そして全員が、経営者が自分たちに不利な行動をしていないかを確かめたいのです。これを<b>利害調整機能</b>といいます。</p>
+<p>冒頭の問いに戻りましょう。株主と銀行と社員とで目に留まる場所が違うのは、三人が結んでいる約束の中身が違うからです。株主は利益と配当に、銀行は返済の力に、社員は給与を払い続けられるかに目が行きます。同じ数字が、読む人の立場によって違う物語を語るのです。</p>
+
+<h3 id="ch1-4">数字は、比べてはじめて意味を持つ</h3>
+<p>「この会社の売上高は一兆円です」と聞いて、すごいと思うでしょうか。業界の巨人にとっての一兆円は不振の年かもしれず、小さな会社なら驚くほどの数字です。数字は一つだけ見ても、良いとも悪いとも言えません。</p>
+<p>分析の方法は、大きく二つに分かれます。会計の数字をそのまま使う<b>実数分析</b>と、特定の項目で割って基準をそろえる<b>比率分析</b>です。比率分析にはさらに三つの型があります。総資産や売上高を基準にして各項目の割合を見る<b>構成比分析</b>、収益性・効率性・安全性などの指標で二つの項目の関係を見る<b>関係比分析</b>、そして基準の年度を百として推移を見る<b>趨勢比分析</b>です。趨勢比は第四章でもう一度登場します。</p>
+<p>三つの違いは、同じ会社を三つの角度から眺めてみるとよくわかります。売上高が千億円、営業利益が五十億円の会社があったとしましょう。</p>
+<ul>
+<li>売上高を百として、売上原価が六十、販売費が三十五、営業利益が五、というふうに内訳の割合を見るのが<b>構成比分析</b>です。もうけの薄さが一目でわかります。</li>
+<li>営業利益を売上高で割って「売上高営業利益率は五％」と、二つの項目の関係を一つの指標にするのが<b>関係比分析</b>です。ライバル会社と比べるときは、たいていこの形を使います。</li>
+<li>五年前の売上高を百として、今年は百三十、と伸び方を追いかけるのが<b>趨勢比分析</b>です。</li>
+</ul>
+<p>同じ会社でも、切り口を変えると見えるものが変わります。構成比は「体のつくり」、関係比は「体力測定の結果」、趨勢比は「成長の記録」にたとえられるでしょう。</p>
+<p>そのうえで、何と比べるかを決めます。これが<b>比較基準</b>です。</p>
+<ul>
+<li>同じ会社の過去と今を比べる<b>時系列分析</b>(前期比など)</li>
+<li>同じ時点の他社と比べる<b>クロスセクション分析</b>(業界平均との比較や、ライバルとの<b>相対業績評価</b>)</li>
+<li>会社が自分で立てた計画の数字と実績を比べる</li>
+<li><b>経営者予想</b>や<b>アナリスト予想</b>と比べる</li>
+<li><b>資本コスト</b>と比べる</li>
+</ul>
+<p>計画と比べる例を一つ見てみましょう。スライドには、フランスベッドホールディングスの中期経営計画が載っています。</p>
+
+<div class="yoko box" id="tab1">
+<p class="box-h">中期経営計画の数値目標(単位:百万円)</p>
+<table>
+<tr><th></th><th>2018年3月期 実績</th><th>2021年3月期 計画</th><th>増減率</th></tr>
+<tr><td>売上高</td><td class="n">52,410</td><td class="n">56,000</td><td class="n">＋6.8%</td></tr>
+<tr><td>営業利益</td><td class="n">2,606</td><td class="n">4,000</td><td class="n">＋53.4%</td></tr>
+<tr><td>経常利益</td><td class="n">2,606</td><td class="n">3,950</td><td class="n">＋51.5%</td></tr>
+<tr><td>当期純利益</td><td class="n">1,806</td><td class="n">2,500</td><td class="n">＋38.4%</td></tr>
+<tr><td>ＲＯＥ</td><td class="n">4.5%</td><td class="n">6.0%</td><td class="n">―</td></tr>
+</table>
+<p class="cap">第4回スライド(教科書 図表1-2)より</p>
+</div>
+
+<p>売上高はわずか六・八％しか増やさないのに、営業利益は五割以上増やすと言っています。つまりこの計画は、たくさん売ることより、一つ売るごとのもうけを厚くすることを狙っています。数字を並べて比べると、計画の性格まで読み取れるのです。</p>
+<p>経営者予想は、証券取引所が提出を求める<b>決算短信</b>で開示されます。見通しが変われば<b>業績予想の修正</b>が出され、適時開示のサービスで誰でも見られます。予想は会社四季報などにも載っています。最後の資本コストは、お金を集めるのにかかるコストのことで、第六章の主役です。</p>
+
+<h3 id="ch1-5">決算書はどこにあるのか</h3>
+<p>財務諸表は、実は誰でも無料で読めます。日本では、<b>金融庁</b>が運営する<b>ＥＤＩＮＥＴ</b>という電子開示システムで、上場会社の有価証券報告書を見ることができます。始まったのは<b>二〇〇一年六月</b>です。アメリカには、証券取引委員会(<b>ＳＥＣ</b>)が運営する<b>ＥＤＧＡＲ</b>があり、こちらは<b>一九九六年</b>から動いています。ほかに、各企業のウェブサイトや証券会社のサイトからも手に入ります。</p>
+<p>会社の側も、投資家にわかってもらおうと情報を発信しています。これを<b>ＩＲ</b>(インベスター・リレーションズ)活動といい、優れたＩＲを表彰する仕組みもあります。</p>
+<p>さらに近年は、数字にならない情報も重視されるようになりました。財務の数字のような<b>定量的情報</b>に対して、顧客満足度のような<b>定性的情報</b>があり、その代表が環境・社会・ガバナンスを表す<b>ＥＳＧ</b>です。こうした<b>非財務情報</b>も、会社を読む材料になります。</p>
+<p>読む対象になる会社は、どれくらいあるのでしょうか。会社が株式市場から資金を集めるための場が証券取引所で、東京証券取引所は現在、プライム・スタンダード・グロースの三つの市場に分かれています。スライドの表では、二〇二二年九月末にプライム市場だけで千八百三十一社が上場していました。</p>
+<p>そして、そのうち多くの会社が同じ時期に決算を迎えます。スライドの決算期の分布を見ると、三千七百五十三社のうち二千四百二十一社、約六五％が<b>三月決算</b>で、次に多い十二月決算(約一一％)を大きく引き離しています。日本の会社の「一年」は、学校と同じく四月に始まって三月に終わるのがふつうなのです。この本で「二〇一三年三月期」と書いたら、「二〇一三年三月に終わる一年間」のことだと思ってください。五月ごろに決算の発表が集中するのも、このためです。</p>
+
+<h3 id="ch1-6">数字を疑う目</h3>
+<p>ここまで読むと、財務諸表は客観的な事実の記録のように思えるかもしれません。ところが教科書は、分析するときの注意点として、ある不穏な言葉を挙げています。<b>利益マネジメント</b>です。</p>
+<p>会計のルールでは、ある一つの事実に対して、<b>複数の会計方法の選択が認められています</b>。機械の価値を毎年どう減らしていくか一つとっても、やり方は何通りかあり、どれを選ぶかで利益の額が変わります。経営者がこの選択の幅を使って利益を調整することを、利益マネジメントといいます。ルールの範囲内の行動なので、ルールを破る<b>粉飾とは区別します</b>。</p>
+<p>なぜ経営者は、わざわざ利益を動かしたくなるのでしょうか。会計の数字を公表すると、株価や経営者の報酬、借入れの条件などに実際の影響が出るからです。これを<b>経済的帰結</b>といいます。数字が現実を動かすから、人は数字を動かしたくなる。この話は第七章でじっくり扱います。</p>
+<p>もう一つの注意点は、会計基準の国際化です。日本の基準を国際的な基準に近づける<b>収斂</b>(コンバージェンス)や、国際的な基準をそのまま使う<b>全面適用</b>(アドプション)が進んでいます。そのため、年度や会社によってルールが違い、比べる前に<b>財務データを修正しなければならない</b>場合があります。</p>
+
+<h3 id="ch1-7">「常識」を確かめる学問</h3>
+<p>最後に、この分野の面白さに触れておきます。</p>
+<p>ふつうの財務諸表分析は、二社か三社を比べるケース・スタディのように、その場その場で分析して解釈するものです。それに対して<b>実証会計研究</b>は、「赤字を嫌う経営者は、利益を少しだけ黒字に見せるはずだ」といった経験則や常識を仮説の形にして、何千、何万という会社のデータで統計的に検証します。こうして積み上がった証拠は年々増えています。そして、その証拠は新しいデータでいつでも覆される可能性がある、つまり<b>反証可能</b>です。</p>
+<p>経営分析は、電卓を叩いて比率を出すだけの作業ではありません。人がどう判断し、どう数字を動かし、市場がそれにどう反応するかを、データで確かめていく学問でもあるのです。第四章と第七章では、その研究の成果がいくつも出てきます。</p>
+<p>では、いよいよ数字の中に入っていきましょう。最初の謎は、とても素朴なものです。もうかっているはずの会社が、なぜお金に困るのか。</p>
+
+<div class="end">
+<p class="end-h">この章の核心</p>
+<ol>
+<li>財務諸表は「ビジネスの言語」。Ｂ／Ｓは一時点の写真、Ｐ／Ｌは一期間の動画で、利益は五つの段に分かれる。</li>
+<li>会社は利害関係者との「契約の集合体」。財務諸表は契約の前(意思決定支援機能)と後(利害調整機能)に使われる。</li>
+<li>数字は比べてはじめて意味を持つ。比率分析の三つの型と比較基準を使い分け、利益マネジメントや基準の違いに注意して読む。</li>
+</ol>
+<p class="end-h">キーワード</p>
+<p class="kw">ビジネスの言語／貸借対照表／損益計算書／売上総利益／営業利益／経常利益／税金等調整前当期純利益／当期純利益／利害関係者／契約の集合体／意思決定支援機能／利害調整機能／実数分析／比率分析／構成比分析／関係比分析／趨勢比分析／時系列分析／クロスセクション分析／相対業績評価／決算短信／業績予想修正／資本コスト／ＥＤＩＮＥＴ／ＥＤＧＡＲ／ＩＲ／非財務情報／ＥＳＧ／利益マネジメント／粉飾／経済的帰結／収斂／全面適用／実証会計研究／反証可能</p>
+<p class="end-h">考えてみよう</p>
+<ol>
+<li>財務諸表の「意思決定支援機能」と「利害調整機能」の違いを、利害関係者を一人選んで具体的に説明しなさい。</li>
+<li>利益マネジメントとは何か。粉飾とどう違うか、また経営者が利益を調整しようとする理由とあわせて説明しなさい。</li>
+</ol>
+</div>
+</section>
+
+<section class="chapter" id="ch2" data-title="黒字なのにお金がない" data-src="第3回・教科書第7章">
+<h2 class="ch-title"><span class="ch-no">第二章</span>黒字なのにお金がない</h2>
+
+<p class="lead">決算は黒字。売上も伸びている。それなのに、ある月の給料日に会社の口座が空っぽになる。利益が出ているのに、なぜ会社はお金に困るのだろうか。</p>
+
+<h3 id="ch2-1">もうかっているのに、つぶれる</h3>
+<p>文房具の卸売りをする小さな会社を想像してください。春に大口の注文が入り、三月に千万円分の商品を納めました。仕入れ値は七百万円なので、三百万円のもうけです。損益計算書の上では、三月の時点で売上高も利益もきちんと計上されます。</p>
+<p>ところが、取引先との約束は「代金は三か月後に払います」でした。一方で、仕入先には翌月に七百万円を払わなければなりません。従業員の給料も、事務所の家賃も、毎月出ていきます。帳簿の上では三百万円もうかっているのに、手元の現金はみるみる減っていき、六月の入金を待たずに支払いができなくなる。こうして、黒字のまま会社が行き詰まることがあります。これを<b>黒字倒産</b>と呼びます<span class="tag tag-補足">補足</span>。</p>
+<p>利益とお金は、同じものではないのです。</p>
+
+<h3 id="ch2-2">ズレの二つの正体</h3>
+<p>教科書は、キャッシュ・フローと利益のズレの原因として、二つを挙げています。</p>
+<p>一つめは<b>信用取引</b>です。いまの卸売会社のように、掛けで売り買いをすると、売上や費用は取引をしたときに計上されますが、お金が動くのはあとになります。</p>
+<p>二つめは<b>設備投資</b>です。千万円の機械を買えば、お金は買った年にまとめて出ていきます。ところが利益の計算では、その機械を使う年数、たとえば五年に分けて、毎年二百万円ずつを費用にします。これが減価償却です。お金は一度に出るのに、費用は少しずつ。ここでも利益とお金がずれます。</p>
+
+<figure class="yoko" id="fig3">
+<svg viewBox="0 0 460 230" role="img" aria-label="掛け売りと設備投資による利益とお金の時間差">
+<text x="20" y="20" class="t-h">掛けで売る</text>
+<line x1="20" y1="55" x2="440" y2="55" class="ax"/>
+<circle cx="90" cy="55" r="6" class="f-c"/><text x="90" y="42" class="t-s" text-anchor="middle">３月 納品</text><text x="90" y="78" class="t-s" text-anchor="middle">売上・利益が立つ</text>
+<circle cx="350" cy="55" r="6" class="f-a"/><text x="350" y="42" class="t-s" text-anchor="middle">６月 入金</text><text x="350" y="78" class="t-s" text-anchor="middle">お金が入る</text>
+<path d="M100 55 Q220 18 340 55" class="arc"/><text x="220" y="28" class="t-s" text-anchor="middle">この間、お金はまだ無い</text>
+<text x="20" y="118" class="t-h">機械を買う(５年使う)</text>
+<text x="20" y="145" class="t-s">お金の出入り</text>
+<rect x="110" y="132" width="60" height="18" class="f-b"/><text x="140" y="145" class="t-s" text-anchor="middle">1,000</text>
+<text x="20" y="190" class="t-s">費用(減価償却)</text>
+<g class="f-c"><rect x="110" y="177" width="60" height="18"/><rect x="175" y="177" width="60" height="18"/><rect x="240" y="177" width="60" height="18"/><rect x="305" y="177" width="60" height="18"/><rect x="370" y="177" width="60" height="18"/></g>
+<g class="t-s" text-anchor="middle"><text x="140" y="190">200</text><text x="205" y="190">200</text><text x="270" y="190">200</text><text x="335" y="190">200</text><text x="400" y="190">200</text></g>
+<g class="t-s" text-anchor="middle"><text x="140" y="215">1年目</text><text x="205" y="215">2年目</text><text x="270" y="215">3年目</text><text x="335" y="215">4年目</text><text x="400" y="215">5年目</text></g>
+</svg>
+<figcaption>図3　利益とお金がずれる二つの理由。どちらも「いつ記録するか」の違いで、合計は同じになる[新規作図](単位:万円)</figcaption>
+</figure>
+
+<p>図をよく見ると、どちらのズレも「時期」の違いにすぎないことがわかります。売上の代金はいずれ入ってきますし、機械の代金は五年かけて全部が費用になります。だから会社が生まれてから終わるまでの全期間を合計すれば、利益の合計とキャッシュ・フローの合計は等しくなります。これを<b>一致の原則</b>といいます。ズレているのは、あくまで途中の一年一年なのです。</p>
+<p>ところが、会社が生き延びられるかどうかは、その途中の一年一年、いや一か月一か月で決まります。給料日に払えなければ、全期間で帳尻が合うことには何の意味もありません。</p>
+
+<h3 id="ch2-3">だから、お金の記録が要る</h3>
+<p>そこで登場するのが、三枚目の財務諸表、<b>キャッシュ・フロー計算書</b>(Ｃ／Ｓ)です。お金が実際にどれだけ入って、どれだけ出ていったかの記録です。教科書は、この書類の意義を三つにまとめています。</p>
+<ul>
+<li>短期的には、実際のキャッシュ・フローの数値そのものが<b>支払能力</b>を示す。</li>
+<li><b>資金繰り</b>の状況がわかる。</li>
+<li>利益には経営者の<b>恣意性</b>が入る一方、キャッシュ・フローはお金の出入りという事実にもとづくので、<b>客観性が高い</b>。だから<b>利益情報の検証</b>にも使える。</li>
+</ul>
+<p>三つめは、あとで大きな意味を持ちます。第一章の終わりで、経営者は会計方法を選ぶことで利益を動かせると書きました。けれど、口座に入ったお金の額は、選び方によって変わりません。利益という「意見」を、お金という「事実」で確かめる。この発想は、第七章で利益マネジメントを見破る道具になります。</p>
+<p>日本では、<b>二〇〇〇年三月期</b>から、上場会社に<b>連結キャッシュ・フロー計算書</b>の作成が義務づけられました。それ以前は、お金の流れを外から正確に知ることは難しかったのです。</p>
+
+<h3 id="ch2-4">お金の財布は三つある</h3>
+<p>キャッシュ・フロー計算書は、会社のお金の出入りを、性格の違う三つの区分に分けて示します。</p>
+
+<div class="yoko box">
+<p class="box-h">キャッシュ・フロー計算書の三つの区分</p>
+<table>
+<tr><th>区分</th><th>中身</th><th>符号のめやす</th></tr>
+<tr><td>営業活動によるキャッシュ・フロー(営業ＣＦ)</td><td>本業で稼いだお金</td><td>プラスが健全</td></tr>
+<tr><td>投資活動によるキャッシュ・フロー(投資ＣＦ)</td><td>設備投資や有価証券の売買</td><td>通常マイナス</td></tr>
+<tr><td>財務活動によるキャッシュ・フロー(財務ＣＦ)</td><td>負債に関する財務活動(借入れ・返済、社債)、資本に関する財務活動(株式の発行など)、配当金の支払額</td><td>集めればプラス、返せばマイナス</td></tr>
+</table>
+</div>
+
+<p>家計にたとえるなら、営業ＣＦは給料、投資ＣＦは家や車や資格の勉強に使うお金、財務ＣＦはローンを借りたり返したりするお金です。給料の範囲で暮らし、将来のための出費をし、余ればローンを返す。会社も同じことをしています。</p>
+<p>投資ＣＦが<b>通常はマイナスになる</b>のは、成長しようとする会社は設備にお金を使い続けるからです。逆に投資ＣＦがプラスなら、工場や土地や株を売ってお金をつくっている、というサインになります。</p>
+
+<h3 id="ch2-5">利益からお金を逆算する</h3>
+<p>三つの区分のうち、いちばん大事で、いちばん計算がややこしいのが営業ＣＦです。示し方には二つあります。</p>
+<p><b>直接法</b>は、商品を売って入ったお金、仕入れで払ったお金というように、主要な取引ごとにキャッシュ・フローを総額で示す方法です。家計簿をそのまま集計するようなもので、わかりやすいのですが、手間がかかります。</p>
+<p><b>間接法</b>は、<b>税金等調整前当期純利益</b>を出発点にして、利益とキャッシュ・フローのズレのある項目を一つずつ修正していく方法です。もう計算が終わっている利益から、お金の額を逆算するわけです。実務ではこちらが圧倒的で、日本公認会計士協会の調査では対象の三百社がすべて間接法でした。</p>
+<p>逆算のしかたは、ズレの原因を一つずつ取り消していくことに尽きます。修正する項目は、大きく分けて三種類です。</p>
+<p>一つめは、<b>非キャッシュ損益項目</b>です。減価償却費、減損損失、貸倒引当金などの引当金の増加は、費用として利益を減らしましたが、お金は出ていっていません。だから足し戻します。</p>
+<p>二つめは、金融収益・金融費用と特別損益です。受取利息や受取配当金(金融収益)はいったん引き、支払利息(金融費用)はいったん足します。これらは、あとで実際に受け取った額・払った額として別の行に入れ直すためです。特別損益も加減算して取り除きます。</p>
+<p>三つめは、<b>運転資本の増減</b>です。ここがいちばん間違えやすいところですが、考え方は単純です。</p>
+<ul>
+<li>売上債権(売掛金など)が増えた → まだ回収していないお金が増えた → <b>引く</b></li>
+<li>棚卸資産(在庫)が増えた → お金が商品に化けて倉庫で眠っている → <b>引く</b></li>
+<li>仕入債務(買掛金など)が増えた → 支払いを待ってもらっている → <b>足す</b></li>
+</ul>
+<p>覚え方は「<b>資産が増えたら引く、負債が増えたら足す</b>」。減ったときは符号が逆になります。</p>
+<p>ここまでの足し引きの合計を<b>小計</b>と呼びます。小計の下に、実際に受け取った利息や配当、払った利息、そして払った法人税等を並べて、最後に営業ＣＦが出ます。利息や配当をどの区分に入れるかには、二つのやり方が認められています。</p>
+
+<div class="yoko box">
+<p class="box-h">小計の下にある金融収益・金融費用の表示区分</p>
+<table>
+<tr><th></th><th>受取利息・受取配当金</th><th>支払利息</th><th>支払配当金</th></tr>
+<tr><td>方法１</td><td>営業ＣＦ</td><td>営業ＣＦ</td><td>財務ＣＦ</td></tr>
+<tr><td>方法２</td><td>投資ＣＦ</td><td>財務ＣＦ</td><td>財務ＣＦ</td></tr>
+</table>
+</div>
+
+<p>実際の数字でたどってみましょう。スライドに載っている教科書の練習問題です。支払利息は営業ＣＦの部に記載する方法(方法１)をとり、支払利息と利息の支払額は同じ額だとします。</p>
+
+<figure class="yoko" id="fig4">
+<svg viewBox="0 0 460 250" role="img" aria-label="間接法で営業CFを求める流れ。200から始まり小計281、営業CF171">
+<g class="t-s" text-anchor="middle">
+<text x="40" y="240">税前利益</text><text x="95" y="240">減価償却</text><text x="150" y="240">支払利息</text><text x="205" y="240">売上債権</text><text x="260" y="240">棚卸資産</text><text x="315" y="240">仕入債務</text><text x="370" y="240">利息･税</text><text x="425" y="240">営業CF</text>
+</g>
+<rect x="20" y="85" width="40" height="140" class="f-a"/><text x="40" y="78" class="t-s" text-anchor="middle">200</text>
+<rect x="75" y="47" width="40" height="38" class="f-c"/><text x="95" y="40" class="t-s" text-anchor="middle">＋55</text>
+<rect x="130" y="33" width="40" height="14" class="f-c"/><text x="150" y="26" class="t-s" text-anchor="middle">＋20</text>
+<rect x="185" y="33" width="40" height="13" class="f-b"/><text x="205" y="62" class="t-s" text-anchor="middle">－18</text>
+<rect x="240" y="39" width="40" height="7" class="f-c"/><text x="260" y="32" class="t-s" text-anchor="middle">＋10</text>
+<rect x="295" y="29" width="40" height="10" class="f-c"/><text x="315" y="22" class="t-s" text-anchor="middle">＋14</text>
+<text x="315" y="12" class="t-h" text-anchor="middle">小計 281</text>
+<rect x="350" y="29" width="40" height="77" class="f-b"/><text x="370" y="122" class="t-s" text-anchor="middle">－110</text>
+<rect x="405" y="106" width="40" height="119" class="f-a"/><text x="425" y="99" class="t-h" text-anchor="middle">171</text>
+<line x1="15" y1="225" x2="450" y2="225" class="ax"/>
+</svg>
+<figcaption>図4　間接法の流れ。利益200から、お金の出ない費用を足し戻し、運転資本の増減を直して小計281、利息20と法人税等90を払って営業ＣＦは171[新規作図](数値:第3回スライドの練習問題)</figcaption>
+</figure>
+
+<div class="yoko box calc">
+<p class="box-h">計算の流れ(資料:税金等調整前当期純利益200、減価償却費55、売上債権の増加額18、法人税等の支払額90、支払利息20、棚卸資産の減少額10、仕入債務の増加額14)</p>
+<table>
+<tr><td>税金等調整前当期純利益</td><td class="n">200</td></tr>
+<tr><td>＋ 減価償却費(お金の出ない費用)</td><td class="n">55</td></tr>
+<tr><td>＋ 支払利息(いったん足し戻す)</td><td class="n">20</td></tr>
+<tr><td>－ 売上債権の増加額(資産が増えた)</td><td class="n">△18</td></tr>
+<tr><td>＋ 棚卸資産の減少額(資産が減った)</td><td class="n">10</td></tr>
+<tr><td>＋ 仕入債務の増加額(負債が増えた)</td><td class="n">14</td></tr>
+<tr class="sum"><td>小計</td><td class="n">281</td></tr>
+<tr><td>－ 利息の支払額</td><td class="n">△20</td></tr>
+<tr><td>－ 法人税等の支払額</td><td class="n">△90</td></tr>
+<tr class="sum"><td>営業活動によるキャッシュ・フロー</td><td class="n">171</td></tr>
+</table>
+</div>
+
+<p>利益は二百なのに、お金は百七十一しか増えていません。税金を払ったことに加え、売掛金が増えて回収が遅れているからです。逆に、在庫が減ったことと、仕入れの支払いを待ってもらったことは、お金を助けています。たった数行の足し引きで、この会社のお金の事情がここまで見えてくるのです。</p>
+
+<h3 id="ch2-6">三つの符号が語る、会社の一生</h3>
+<p>三つの区分それぞれがプラスかマイナスかを並べるだけで、会社のおおまかな状態が見えてきます。スライドでは、代表的な経営パターンを四つ挙げています。</p>
+
+<div class="yoko box" id="tab2">
+<p class="box-h">活動区分別のキャッシュ・フローと代表的な経営パターン</p>
+<table>
+<tr><th></th><th>営業ＣＦ</th><th>投資ＣＦ</th><th>財務ＣＦ</th><th>読み方</th></tr>
+<tr><td>①</td><td class="pl">＋</td><td class="mi">－</td><td class="mi">－</td><td>営業活動が順調、新規投資を実行し、有利子負債も圧縮。最も望ましい経営パターン</td></tr>
+<tr><td>②</td><td class="pl">＋</td><td class="mi">－</td><td class="pl">＋</td><td>営業活動がやや順調、新規投資を実行し、資金調達が必要。発展期の経営パターン</td></tr>
+<tr><td>③</td><td class="mi">－</td><td class="mi">－</td><td class="pl">＋</td><td>営業活動の結果はまだ出ていない、新規投資を実行し、資金を調達。新規参入の成長企業の経営パターン</td></tr>
+<tr><td>④</td><td class="mi">－</td><td class="pl">＋</td><td class="pl">＋</td><td>営業活動は不振、投資活動(資産の売却)と財務活動でキャッシュを維持。続けば成長の鈍化による倒産の危険性が高まる</td></tr>
+</table>
+<p class="cap">第3回スライド(教科書 p.154)をもとに作成</p>
+</div>
+
+<p>この並びを、人の一生のように読むこともできます。生まれたばかりの会社(③)は、まだ稼げないのに設備を整え、足りないお金を外から借ります。育ちざかり(②)になると本業で稼げるようになりますが、投資に追いつかず、まだ借り続けます。大人になった会社(①)は、稼いだお金で投資をまかない、借金を返す余裕まであります。そして衰えはじめた会社(④)は、本業で稼げず、持っている資産を売り、借金でしのぎます。</p>
+<p>実際、教科書の図表7-4は、Dickinson(二〇一一)の研究にもとづいて、三つの符号の組み合わせ(八通り)を<b>導入期・成長期・成熟期・淘汰期・衰退期</b>という会社のライフサイクルに割り振っています。上の四つは、それぞれ③が導入期、②が成長期、①が成熟期、④が衰退期にあたります<span class="tag tag-補足">補足</span>。決算書の三つの符号に、会社の年齢が刻まれているわけです。</p>
+
+<h3 id="ch2-7">稼いだ範囲で投資しているか</h3>
+<p>営業ＣＦと投資ＣＦの関係は、グラフにするとさらによくわかります。横軸に営業ＣＦ、縦軸に投資ＣＦをとって、会社を一つの点として打つのです。</p>
+
+<figure class="yoko" id="fig6">
+<svg viewBox="0 0 400 260" role="img" aria-label="横軸が営業CF、縦軸が投資CF。対角線の右側は営業CFが投資を上回る">
+<rect x="50" y="20" width="320" height="200" class="f-box"/>
+<polygon points="50,20 370,220 370,20" class="f-c" opacity=".35"/>
+<line x1="50" y1="20" x2="370" y2="220" class="dash"/>
+<text x="210" y="248" class="t-s" text-anchor="middle">営業ＣＦ(右ほど多く稼ぐ)→</text>
+<text x="22" y="120" class="t-s" text-anchor="middle" transform="rotate(-90 22 120)">投資ＣＦ(下ほど多く使う)→</text>
+<text x="300" y="70" class="t-s" text-anchor="middle">右側:営業ＣＦ＞|投資ＣＦ|</text>
+<text x="300" y="88" class="t-s" text-anchor="middle">商船三井(財務ＣＦも－)</text>
+<text x="140" y="175" class="t-s" text-anchor="middle">左側:投資が稼ぎを上回る</text>
+<text x="140" y="193" class="t-s" text-anchor="middle">日本郵船(最近、財務ＣＦは＋)</text>
+<text x="335" y="210" class="t-s" text-anchor="end">対角線:同じ額</text>
+</svg>
+<figcaption>図6　営業ＣＦと投資ＣＦの関係。対角線は両者が絶対値で同じ額になる線(第3回スライドの説明をもとに作図。会社の位置は模式)</figcaption>
+</figure>
+
+<p>対角線は、営業ＣＦと投資ＣＦが絶対値で同じ額になる線です。<b>営業ＣＦ＞｜投資ＣＦ｜</b>なら対角線の右側に来ます。稼いだお金の範囲で投資をまかなえている状態で、「投資は営業ＣＦの範囲内で」と言われることがあります。左側に来るなら、稼ぎ以上に投資しているので、その差は借入れなど財務活動で埋めているはずです。</p>
+<p>スライドでは、同じ海運業の二社が比べられています。商船三井は対角線の右側にいて、財務ＣＦもマイナス、つまり稼いだお金で投資をし、借金も返していました。日本郵船は最近は左側にいて、財務ＣＦはプラス、つまり投資のためにお金を集めていました。同じ業界でも、お金の使い方の方針はこれほど違うのです。</p>
+<p>右側にいるということは、稼いだお金から投資を払っても、まだ手元に残りがあるということです。この「残り」こそ、会社が自由に使えるお金です。では、それはどう計算し、何に使われるのか。次の章で見ていきましょう。</p>
+
+<div class="end">
+<p class="end-h">この章の核心</p>
+<ol>
+<li>利益とお金は、信用取引と設備投資のせいで時期がずれる。全期間なら一致する(一致の原則)が、会社の生死は途中の資金繰りで決まる。</li>
+<li>キャッシュ・フロー計算書は営業・投資・財務の三区分。お金の事実にもとづくので客観性が高く、利益の検証にも使える。</li>
+<li>間接法は利益からお金を逆算する。非キャッシュ損益を足し戻し、資産の増加は引き、負債の増加は足す。三つの符号の組み合わせで会社の状態が読める。</li>
+</ol>
+<p class="end-h">キーワード</p>
+<p class="kw">キャッシュ・フロー計算書／信用取引／設備投資／一致の原則／支払能力／資金繰り／客観性／連結キャッシュ・フロー計算書／営業活動によるキャッシュ・フロー／投資活動によるキャッシュ・フロー／財務活動によるキャッシュ・フロー／直接法／間接法／税金等調整前当期純利益／非キャッシュ損益項目／減価償却費／減損損失／引当金／運転資本／小計／表示区分／経営パターン／ライフサイクル／対角線</p>
+<p class="end-h">考えてみよう</p>
+<ol>
+<li>会計利益とキャッシュ・フローがずれる原因を二つあげ、それでも全期間では両者が一致する理由を説明しなさい。</li>
+<li>営業ＣＦ＋・投資ＣＦ－・財務ＣＦ－の会社と、営業ＣＦ－・投資ＣＦ＋・財務ＣＦ＋の会社は、それぞれどのような状態だと読めるか。</li>
+</ol>
+</div>
+</section>
+
+<section class="chapter" id="ch3" data-title="自由に使えるお金" data-src="第3回・教科書第7章">
+<h2 class="ch-title"><span class="ch-no">第三章</span>自由に使えるお金</h2>
+
+<p class="lead">給料が三十万円あっても、家賃と光熱費と通勤の定期代を払えば、自由に使えるのは半分もないかもしれない。会社にとっての「自由に使えるお金」は、いったいいくらなのだろうか。</p>
+
+<h3 id="ch3-1">利益の代わりに、お金で測る</h3>
+<p>前の章で、利益は「意見」、お金は「事実」だと書きました。それなら、これまで利益を使って測ってきた会社の力を、お金で測り直すこともできるはずです。教科書は、営業ＣＦを使った指標を三つの目的に分けて紹介しています。収益性、安全性、そして設備投資です。</p>
+<p>指標というと身構えてしまいますが、どれも「何を、何で割るか」の組み合わせにすぎません。分子に営業ＣＦを置けば「稼ぐ力」を、分母に借金や利息を置けば「返す力」を測ることになります。</p>
+
+<h3 id="ch3-2">稼ぐ力と返す力</h3>
+<p>まず、稼ぐ力です。売上高のうち、どれだけが本当のお金として残ったかを見るのが<b>営業ＣＦマージン</b>、株主から預かったお金(自己資本)に対して、どれだけのお金を稼いだかを見るのが<b>自己資本営業ＣＦ比率</b>です。</p>
+
+<div class="yoko box">
+<p class="box-h">収益性分析</p>
+<p class="f">営業ＣＦマージン(％)＝ 営業ＣＦ ÷ 売上高 × 100</p>
+<p class="f">自己資本営業ＣＦ比率(％)＝ 営業ＣＦ ÷ 自己資本 × 100</p>
+<p class="cap">営業ＣＦには、金融収支・税控除前の営業ＣＦ(小計欄)を使うのも良い(第3回スライド)</p>
+</div>
+
+<p>次に、返す力です。お金を貸している銀行の立場で考えてみてください。知りたいのは、この会社が借金を返せるかどうかです。</p>
+
+<div class="yoko box">
+<p class="box-h">安全性分析</p>
+<p class="f">営業ＣＦ対流動負債比率(％)＝ 営業ＣＦ ÷ 流動負債 × 100</p>
+<p class="f">債務償還年数(年)＝ 有利子負債 ÷ 営業ＣＦ</p>
+<p class="f">営業ＣＦ対利払率(倍)＝ 営業ＣＦ ÷ 支払利息</p>
+</div>
+
+<p>この中でいちばん直感的なのが<b>債務償還年数</b>です。利子のつく借金(有利子負債)を、本業で毎年稼ぐお金で全部返すとしたら、何年かかるか。年収の何倍の住宅ローンを組んでいるか、という感覚に近いでしょう。短いほど安全です。この指標だけは、営業ＣＦが分子ではなく<b>分母</b>に来ることに気をつけてください。</p>
+<p>たとえば、どちらも四百億円の借金を抱えたＡ社とＢ社があるとします。借金の額だけを見れば、二社は同じくらい危なく見えます。ところが、Ａ社は本業で毎年百億円のお金を稼ぎ、Ｂ社は二十億円しか稼げません。債務償還年数は、Ａ社が四年、Ｂ社が二十年です。同じ四百億円でも、Ａ社にとっては「数年で返せる借金」、Ｂ社にとっては「一世代かかる借金」なのです。借金の重さは、借金の額ではなく、返す力との比で決まります。</p>
+<div class="yoko box calc">
+<p class="box-h">二社の債務償還年数(架空の例)</p>
+<table>
+<tr><th></th><th>有利子負債</th><th>営業ＣＦ</th><th>債務償還年数</th></tr>
+<tr><td>Ａ社</td><td class="n">400億円</td><td class="n">100億円</td><td class="n">400÷100＝4年</td></tr>
+<tr><td>Ｂ社</td><td class="n">400億円</td><td class="n">20億円</td><td class="n">400÷20＝20年</td></tr>
+</table>
+</div>
+<p><b>営業ＣＦ対利払率</b>は、毎年の利息の何倍のお金を稼いでいるかです。スライドには、インタレスト・カバレッジ・レシオ(事業利益÷支払利息)のキャッシュ・フロー版だと書かれています。利益で測っていた「利息を払う余裕」を、お金で測り直したものです。こちらは大きいほど安全です。</p>
+
+<h3 id="ch3-3">投資は身の丈に合っているか</h3>
+<p>三つめは設備投資です。会社が設備にどれだけお金を使っているかを、稼いだお金と比べます。</p>
+
+<div class="yoko box">
+<p class="box-h">設備投資分析</p>
+<p class="f">設備投資比率(％)＝ 営業ＣＦ ÷ 設備投資額 × 100</p>
+<p class="f">投資ＣＦ対営業ＣＦ比率(％)＝ 投資ＣＦ ÷ 営業ＣＦ × 100</p>
+<p class="cap">設備投資額＝投資ＣＦの「有形固定資産及び無形固定資産の取得のための支出」－「有形固定資産及び無形固定資産の売却収入」(正味設備投資額)</p>
+</div>
+
+<p>ここでの設備投資額は「正味」の額です。新しい機械を買ったお金から、古い機械を売って入ったお金を差し引きます。買い替えのたびに古いものを売る会社なら、実際の負担はその差額だけだからです。</p>
+<p>投資ＣＦ対営業ＣＦ比率は、前の章の対角線のグラフを一つの数字にしたものだと考えると、わかりやすいでしょう。この比率の絶対値が百％を下回っていれば、稼いだ範囲で投資している、つまり対角線の右側にいることになります。</p>
+
+<h3 id="ch3-4">フリー・キャッシュ・フロー</h3>
+<p>いよいよ、冒頭の問いに答えるときです。</p>
+<p>会社が本業で稼いだお金から、税金を払い、事業を続けるために必要な設備投資を済ませたあとに残るお金。これを<b>フリー・キャッシュ・フロー</b>(ＦＣＦ)といいます。スライドの定義は「本業で得た正味キャッシュ・イン・フローから法人税等と設備投資を控除したもの」です(スライドには「テキストと少し異なる」という注意書きがあります)。</p>
+<p>給料から家賃や光熱費を払ったあとに残るお金が、貯金にも旅行にも使える自由なお金であるように、ＦＣＦは、借金を返すことにも、株主に配当を払うことにも、新しい事業に挑むことにも使えるお金です。だからＦＣＦは<b>企業の経営成果の判断基準</b>になり、また後半の授業で扱う<b>企業価値評価</b>にも使われます。会社の値打ちは、将来にわたって生み出す自由なお金の大きさで決まる、と考えるからです。</p>
+<p>なぜ利益ではなく、自由なお金なのでしょうか。会社を丸ごと買う人の身になってみるとわかります。買った会社が毎年いくらの利益を「計上」するかより、毎年いくらのお金を自分の手元に「渡してくれる」かのほうが、ずっと大事なはずです。利益がいくら大きくても、設備投資にすべて消えてしまうなら、持ち主の手には何も残りません。ＦＣＦは、会社の持ち主の目線で見た、ほんとうの稼ぎなのです。</p>
+<p>算定方法は二つあります。</p>
+
+<div class="yoko box">
+<p class="box-h">フリー・キャッシュ・フローの算定方法</p>
+<p class="f">① ＦＣＦ ＝ 営業ＣＦ ＋ 投資ＣＦ</p>
+<p class="f">② ＦＣＦ ＝ 営業ＣＦの小計 － 営業ＣＦの法人税等の支払額 －(投資ＣＦから求める)正味設備投資</p>
+</div>
+
+<p>①は手軽な方法です。投資ＣＦはふつうマイナスなので、足すと実質的には引き算になります。②は、利息の受け払いなど財務の要素を取り除いて、本業と税金と設備投資だけでＦＣＦを組み立てる方法です。スライドでは、三越伊勢丹ホールディングスの数字でこの②を計算しています。</p>
+
+<figure class="yoko" id="fig7">
+<svg viewBox="0 0 460 150" role="img" aria-label="三越伊勢丹HD 2013年3月期のFCFの算定">
+<rect x="10" y="20" width="120" height="44" class="f-box"/><text x="70" y="38" class="t-s" text-anchor="middle">財務収支・</text><text x="70" y="54" class="t-s" text-anchor="middle">税控除前営業ＣＦ</text>
+<rect x="160" y="20" width="90" height="44" class="f-box"/><text x="205" y="38" class="t-s" text-anchor="middle">法人税等</text><text x="205" y="54" class="t-s" text-anchor="middle">の支払額</text>
+<rect x="280" y="20" width="80" height="44" class="f-box"/><text x="320" y="38" class="t-s" text-anchor="middle">正味設備</text><text x="320" y="54" class="t-s" text-anchor="middle">投資額</text>
+<rect x="390" y="20" width="60" height="44" class="f-a"/><text x="420" y="47" class="t-h" text-anchor="middle">ＦＣＦ</text>
+<text x="70" y="100" class="t-h" text-anchor="middle">7,068</text><text x="145" y="100" class="t-h" text-anchor="middle">－</text>
+<text x="205" y="100" class="t-h" text-anchor="middle">4,504</text><text x="265" y="100" class="t-h" text-anchor="middle">－</text>
+<text x="320" y="100" class="t-h" text-anchor="middle">29,126</text><text x="375" y="100" class="t-h" text-anchor="middle">＝</text>
+<text x="420" y="100" class="t-h" text-anchor="middle">▲26,562</text>
+<text x="230" y="135" class="t-s" text-anchor="middle">(単位:百万円、2013年3月期)</text>
+</svg>
+<figcaption>図7　三越伊勢丹ホールディングスのＦＣＦ(第3回スライド、教科書 式7.1)</figcaption>
+</figure>
+
+<p>答えはマイナス、二百六十五億円あまりの赤字です。本業で七十億円を稼ぎ、四十五億円の税金を払ったうえで、二百九十億円を超える設備投資をした年でした。ＦＣＦがマイナスだからといって、すぐに悪い会社だとは言えません。将来のために大きく投資した年なのか、本業がお金を生まなくなっているのか。その見極めこそが分析の仕事です。</p>
+
+<h3 id="ch3-5">利益から組み立てる近道</h3>
+<p>キャッシュ・フロー計算書が手元になくても、ＦＣＦをおおまかに見積もる方法があります。スライドで<b>間便法</b>と呼ばれているもので、教科書の式七・九です。</p>
+
+<div class="yoko box">
+<p class="box-h">間便法(教科書 式7.9)</p>
+<p class="f">ＦＣＦ ＝ ＥＢＩＴ ×(１－τ)＋ ＤＰ －(ＣＡＰＥＸ ＋ ΔＷＣ)</p>
+<table>
+<tr><td>ＥＢＩＴ ×(１－τ)</td><td>みなし税引後営業利益(ＮＯＰＬＡＴ)。営業利益(ＥＢＩＴ)から、その利益にかかる税金(税率τ)を引いたもの</td></tr>
+<tr><td>ＤＰ</td><td>減価償却費</td></tr>
+<tr><td>ＣＡＰＥＸ</td><td>正味設備投資額</td></tr>
+<tr><td>ΔＷＣ</td><td>増加運転資本</td></tr>
+</table>
+</div>
+
+<p>式は物々しく見えますが、やっていることは前の章の間接法とまったく同じです。本業の利益から税金を引き(ＮＯＰＬＡＴ)、お金の出ない費用である減価償却費を足し戻し、設備投資と、売掛金や在庫が増えて寝てしまったお金(増加運転資本)を引く。間接法で「資産が増えたら引く」と覚えたことが、ここではΔＷＣという一つの記号にまとめられています。</p>
+<p>こうして見ると、第二章と第三章は一本の線でつながっています。利益とお金のズレを理解すれば、利益からお金を組み立て直すことができ、そこから「自由に使えるお金」を取り出せるのです。</p>
+
+<div class="aside">
+<p class="aside-h">キャッシュ・コンバージョン・サイクル <span class="tag tag-要確認">要確認</span></p>
+<p>シラバスでは、第三回のテーマに「キャッシュコンバージョンサイクル(ＣＣＣ)」も挙がっていますが、配られたスライドには見当たりません。授業で説明していなければ、中間テストの範囲外です(「第三回で説明していない部分は除く」)。中身だけ書いておくと、ＣＣＣは仕入れの代金を払ってから、売上の代金を回収するまでの日数で、売上債権回転日数＋棚卸資産回転日数－仕入債務回転日数で求めます。短いほど、払ったお金が早く戻ってくる会社です。</p>
+</div>
+
+<p>さて、ここまでは一年という時間を切り取って会社を見てきました。けれど会社は生き物で、年ごとに大きくなったり小さくなったりします。次の章では、時間の軸を伸ばして、会社の「伸び」を測ってみましょう。そこには、思いがけない法則が待っています。</p>
+
+<div class="end">
+<p class="end-h">この章の核心</p>
+<ol>
+<li>営業ＣＦを使うと、稼ぐ力(営業ＣＦマージンなど)、返す力(債務償還年数・営業ＣＦ対利払率など)、投資の身の丈(設備投資比率など)をお金で測り直せる。</li>
+<li>ＦＣＦは、本業のお金から税金と設備投資を引いた「自由に使えるお金」。営業ＣＦ＋投資ＣＦ、または小計－法人税等－正味設備投資で求める。</li>
+<li>間便法 ＦＣＦ＝ＥＢＩＴ(１－τ)＋ＤＰ－(ＣＡＰＥＸ＋ΔＷＣ)は、間接法と同じ発想で利益からお金を組み立てる。</li>
+</ol>
+<p class="end-h">キーワード</p>
+<p class="kw">営業ＣＦマージン／自己資本営業ＣＦ比率／営業ＣＦ対流動負債比率／債務償還年数／有利子負債／営業ＣＦ対利払率／インタレスト・カバレッジ・レシオ／設備投資比率／正味設備投資額／投資ＣＦ対営業ＣＦ比率／フリー・キャッシュ・フロー／企業価値評価／間便法／ＮＯＰＬＡＴ／ＥＢＩＴ／ＣＡＰＥＸ／増加運転資本</p>
+<p class="end-h">考えてみよう</p>
+<ol>
+<li>フリー・キャッシュ・フローとは何か。二つの算定方法を示し、ＦＣＦがマイナスの会社をどう評価すべきか述べなさい。</li>
+</ol>
+</div>
+</section>
+
+<section class="chapter" id="ch4" data-title="伸びる会社は、伸び続けるか" data-src="第5回・教科書第9章">
+<h2 class="ch-title"><span class="ch-no">第四章</span>伸びる会社は、伸び続けるか</h2>
+
+<p class="lead">去年、売上が三割も伸びた会社がある。今年もまた三割伸びるだろうか。来年は、再来年は。会社の「伸び」は、どこまで信じて未来に引き伸ばしてよいのだろうか。</p>
+
+<h3 id="ch4-1">伸びを測る三つのものさし</h3>
+<p>ここまでの章では、一年という時間を切り取って会社を見てきました。この章では時間の軸を伸ばします。毎年公表される売上や利益の流れ、つまり<b>業績の推移</b>を追いかけて、会社がどれだけ成長しているかを測るのが<b>成長性分析</b>です。</p>
+<p>伸びを数字にするものさしは三つあります。</p>
+
+<div class="yoko box">
+<p class="box-h">業績の推移を表す指標(教科書 p.194)</p>
+<p class="f">前期比 ＝(当期実績値 － 前期実績値)÷ 前期実績値 × 100</p>
+<p class="f">趨勢比 ＝(当期実績値 － ベース年度実績値)÷ ベース年度実績値 × 100</p>
+<p class="f">年平均成長率 ＝(<sup>年数</sup>√(当期実績値 ÷ ベース年度実績値)－ 1)× 100</p>
+</div>
+
+<p>一つめの<b>前期比</b>は、去年と比べてどれだけ伸びたかです。前期の売上が百、当期が百二十なら、二〇％の伸びです。講義では、前期比を「当期÷前期」で表し、変化がなければ一になる書き方もあるが、教科書では「前期からの差分の割合」で表す、と補足がありました<span class="tag tag-講義">講義</span>。</p>
+<p>二つめの<b>趨勢比</b>は、ある年を基準にして、そこからどれだけ伸びたかです。たとえば二〇二〇年を基準にすれば、二〇二一年、二〇二二年、二〇二三年が、それぞれ二〇二〇年に比べてどれだけ変わったかを見ることになります。新聞や雑誌のグラフでおなじみの見せ方です。</p>
+<p>ただし、ここには落とし穴があります。講義ではこんな例が挙げられていました。ある会社の売上は、ふだんはだいたい三百前後で推移しているのに、二〇二〇年だけはコロナの影響で極端に小さかったとします。この落ち込んだ年をベース年度にすると、その後の年はどれも、いかにも大きく伸びたように見えてしまいます。<b>ベース年度をどこに置くかで、見え方はがらりと変わる</b>のです。見る側も、どこを基準にしているかを気にしながら判断しないと、比率に「だまされる」ことになります<span class="tag tag-講義">講義</span>。</p>
+
+<h3 id="ch4-2">平均には二種類ある</h3>
+<p>三つめの<b>年平均成長率</b>は、少し考える必要があります。教科書は、これを<b>幾何平均成長率</b>とも呼んでいます。</p>
+<p>ふつう「平均」と聞いて思い浮かべるのは、全部を足して個数で割る<b>算術平均</b>(単純平均)です。百と二百の平均は百五十。ところが、伸び率のように「掛け算で積み重なっていくもの」の平均を、この足し算の平均で出すと、おかしなことが起きます。</p>
+<p>講義の例で確かめてみましょう<span class="tag tag-講義">講義</span>。三年前の売上が百、二年前が百十、一年前が百、今年も百だったとします。三年前と今年は同じ百なので、平均の成長率はゼロのはずです。ところが毎年の伸び率は、＋一〇％、－九・一％、〇％。これを足して三で割ると、＋〇・三％になってしまい、ゼロに戻りません。</p>
+<p>百が百十になるのは一〇％の伸びですが、百十が百に戻るのは九・一％の減少にすぎません。割り算の土台が年ごとに変わるので、伸び率を足し算で平均すると狂うのです。そこで、伸びを掛け算でとらえる<b>幾何平均</b>を使います。「毎年同じ率で伸びたとしたら、何％で伸びたことになるか」を、何乗根で逆算するのです。</p>
+
+<figure class="yoko" id="fig8">
+<svg viewBox="0 0 460 220" role="img" aria-label="5年で売上が2倍になるとき、毎年14.87%ずつ伸びれば2倍に届く">
+<line x1="40" y1="190" x2="440" y2="190" class="ax"/>
+<g class="t-s" text-anchor="middle"><text x="70" y="207">ベース</text><text x="140" y="207">1年後</text><text x="210" y="207">2年後</text><text x="280" y="207">3年後</text><text x="350" y="207">4年後</text><text x="420" y="207">5年後</text></g>
+<g class="f-a">
+<rect x="55" y="115" width="30" height="75"/><rect x="125" y="104" width="30" height="86"/><rect x="195" y="91" width="30" height="99"/>
+<rect x="265" y="76" width="30" height="114"/><rect x="335" y="59" width="30" height="131"/><rect x="405" y="40" width="30" height="150"/>
+</g>
+<g class="t-s" text-anchor="middle"><text x="70" y="108">1,000</text><text x="140" y="97">1,149</text><text x="210" y="84">1,320</text><text x="280" y="69">1,516</text><text x="350" y="52">1,741</text><text x="420" y="33">2,000</text></g>
+<text x="55" y="22" class="t-h">毎年 約14.87％ずつ伸びると、5年でちょうど2倍</text>
+</svg>
+<figcaption>図8　年平均成長率の考え方。5期前に1,000万円、当期2,000万円なら、(2,000÷1,000)の5乗根－1＝0.1487。単純に「100％÷5年＝20％」ではない[新規作図](数値:第5回スライドの例)</figcaption>
+</figure>
+
+<p>スライドの例では、五期前の売上高が千万円、当期が二千万円です。五年で二倍になったのだから、一年あたり二〇％と考えたくなります。けれど、二〇％ずつ五年伸びると、千万円は二千四百九十万円近くまで膨らみます。実際には、毎年約一四・九％ずつ伸びれば、五年でちょうど二倍になります。伸びは利息と同じく、前の年の伸びの上にさらに積み重なっていく。だから年平均成長率は、複利の考え方で求めるのです。</p>
+<p>実際の会社の数字では、二つの平均の差はどれくらいになるのでしょうか。講義では、教科書に載っているライオンの例が紹介されていました<span class="tag tag-講義">講義</span>。</p>
+
+<div class="yoko box">
+<p class="box-h">ライオンの売上高と当期純利益の前期比(2014〜2017年)</p>
+<table>
+<tr><th>年</th><th>2014</th><th>2015</th><th>2016</th><th>2017</th><th>算術平均</th><th>年平均成長率</th></tr>
+<tr><td>売上高</td><td class="n">4.4%</td><td class="n">3.1%</td><td class="n">4.5%</td><td class="n">3.8%</td><td class="n">3.9%</td><td class="n">3.9%</td></tr>
+<tr><td>当期純利益</td><td class="n">20.8%</td><td class="n">45.0%</td><td class="n">49.4%</td><td class="n">24.3%</td><td class="n">34.9%</td><td class="n">34.3%</td></tr>
+</table>
+<p class="cap">第5回の講義動画で紹介された教科書の例。伸び率のばらつきが大きいほど、二つの平均の差は広がる</p>
+</div>
+
+<p>売上高のように毎年ほぼ同じ率で伸びていれば、二つの平均はほとんど変わりません。ところが当期純利益のように伸び率が大きくばらつくと、算術平均は実態より高めに出ます。講義では、同じ期間のディー・エヌ・エー(ＤｅＮＡ)も比べていました。売上収益の前期比は－二一・五％、＋〇・九％、＋〇・一％、－三・一％で、算術平均は－五・九％、きちんと幾何平均をとった年平均成長率は－六・四％、趨勢比では－二三・一％。この四年間は成長していなかったことがわかります。それでも自己資本は毎年一割以上増えていて、会社としてはまだ成長の途中にあった、という読み方も紹介されていました<span class="tag tag-講義">講義</span>。</p>
+
+<h3 id="ch4-3">売上の伸びを、何と比べるか</h3>
+<p>成長性の判断で<b>もっともよく使う指標</b>は、売上高の前期比、つまり<b>売上高成長率</b>です。<b>増収率</b>とも呼びます。</p>
+<p>けれど、売上が五％伸びたと聞いても、それが良いのか悪いのかは、やはり比べる相手がいないとわかりません。業界全体が一〇％伸びている年の五％は物足りませんし、業界全体が縮んでいる年の五％は見事です。そこで<b>ベンチマーク</b>(比べる基準)を置きます。基本は<b>同業他社</b>で、講義では「できれば同じくらいの規模の会社」と補足がありました<span class="tag tag-講義">講義</span>。経済全体の物差しとしては、<b>ＧＤＰ、日銀短観、消費者物価指数、鉱工業生産指数</b>などが使われます。日本のように経済全体があまり成長しない時代が続いた中で、ある程度の成長を保っていたなら、それは高い成長性だと言えるかもしれません。</p>
+<p>過去の伸びだけでなく、これからの伸びを予想するための情報もあります。有価証券報告書の<b>セグメント情報</b>には、事業ごと・地域ごとの売上や利益が細かく出ています。また「事業の状況」の中にある<b>「生産、受注及び販売の状況」</b>は、将来を予想するための貴重な手がかりになります。</p>
+<p>なぜ受注が手がかりになるのか。工作機械のように、注文を受けてから作って納める商売では、受注はのちの売上の先触れだからです。スライドの練習問題では、工作機械メーカーの牧野フライス製作所の数字を使って、このことを確かめています。</p>
+
+<figure class="yoko" id="fig9">
+<svg viewBox="0 0 460 250" role="img" aria-label="牧野フライス製作所の受注高、受注残高、売上高の推移(2009年3月期から2013年3月期)">
+<line x1="50" y1="200" x2="440" y2="200" class="ax"/>
+<g class="t-s" text-anchor="end"><text x="44" y="204">0</text><text x="44" y="154">40,000</text><text x="44" y="104">80,000</text><text x="44" y="54">120,000</text></g>
+<g class="dash" opacity=".5"><line x1="50" y1="150" x2="440" y2="150"/><line x1="50" y1="100" x2="440" y2="100"/><line x1="50" y1="50" x2="440" y2="50"/></g>
+<g class="t-s" text-anchor="middle"><text x="90" y="218">2009.3</text><text x="170" y="218">2010.3</text><text x="250" y="218">2011.3</text><text x="330" y="218">2012.3</text><text x="410" y="218">2013.3</text></g>
+<!-- 受注高(棒) 1px=800百万円 -->
+<g class="f-c">
+<rect x="68" y="95.5" width="16" height="104.5"/><rect x="148" y="132" width="16" height="68"/><rect x="228" y="75" width="16" height="125"/><rect x="308" y="44.4" width="16" height="155.6"/><rect x="388" y="53.5" width="16" height="146.5"/>
+</g>
+<!-- 受注残高(棒) -->
+<g class="f-b">
+<rect x="86" y="166.3" width="16" height="33.7"/><rect x="166" y="170.7" width="16" height="29.3"/><rect x="246" y="164.6" width="16" height="35.4"/><rect x="326" y="147.1" width="16" height="52.9"/><rect x="406" y="159.1" width="16" height="40.9"/>
+</g>
+<!-- 売上高(折れ線) -->
+<polyline points="85,74.6 165,127.6 245,81 325,61.9 405,41.5" class="acc"/>
+<g fill="var(--accent)"><circle cx="85" cy="74.6" r="3.5"/><circle cx="165" cy="127.6" r="3.5"/><circle cx="245" cy="81" r="3.5"/><circle cx="325" cy="61.9" r="3.5"/><circle cx="405" cy="41.5" r="3.5"/></g>
+<rect x="60" y="232" width="12" height="10" class="f-c"/><text x="76" y="241" class="t-s">受注高</text>
+<rect x="140" y="232" width="12" height="10" class="f-b"/><text x="156" y="241" class="t-s">受注残高</text>
+<line x1="230" y1="237" x2="248" y2="237" class="acc"/><text x="252" y="241" class="t-s">売上高(販売実績)</text>
+</svg>
+<figcaption>図9　牧野フライス製作所の受注高・受注残高・売上高(単位:百万円)[数値:第5回スライド 練習問題(教科書旧版p.217)]</figcaption>
+</figure>
+
+<p>それぞれの前期比を計算すると、次の表になります。スライドの答えの表は、列の年の並びが逆になっていて、講義でも「左右が逆転していて申し訳ない」と断りがありました<span class="tag tag-講義">講義</span>。ここでは年の順に直して載せます。</p>
+
+<div class="yoko box">
+<p class="box-h">牧野フライス製作所の伸び率(前期比)</p>
+<table>
+<tr><th></th><th>2010年3月期</th><th>2011年3月期</th><th>2012年3月期</th><th>2013年3月期</th></tr>
+<tr><td>受注伸び率</td><td class="n">▲35.0%</td><td class="n">84.1%</td><td class="n">24.4%</td><td class="n">▲5.8%</td></tr>
+<tr><td>受注残高伸び率</td><td class="n">▲13.1%</td><td class="n">20.9%</td><td class="n">49.4%</td><td class="n">▲22.7%</td></tr>
+<tr><td>売上高成長率</td><td class="n">▲42.3%</td><td class="n">64.4%</td><td class="n">16.1%</td><td class="n">14.8%</td></tr>
+</table>
+<p class="cap">例:2010年3月期の受注伸び率 ＝(54,365－83,636)÷83,636×100 ＝ ▲35.0%</p>
+</div>
+
+<p>リーマン・ショックのあとの二〇一〇年三月期、受注は三五％、売上は四二％も落ち込みました。翌年は受注が八四％と大きく戻り、それを追うように売上も六四％伸びています。注目したいのは最後の年です。売上はまだ一四・八％伸びているのに、受注は五・八％減り、受注残高は二二・七％も減っています。受注残高は「これから売上になる仕事の在庫」ですから、この在庫が減ったということは、<b>翌年以降の売上の伸びが鈍る</b>ことを示しています。売上の数字だけを見ていては気づけない変化が、受注の数字にはすでに表れているのです。</p>
+
+<h3 id="ch4-4">自力で、どこまで伸びられるか</h3>
+<p>売上が伸びても、それを支える資産や資本がついてこなければ、成長は長続きしません。講義では、損益計算書に出てくる売上や利益(<b>経営成績</b>)の伸びだけでなく、貸借対照表が表す<b>財政状態</b>も成長している必要がある、と強調されていました<span class="tag tag-講義">講義</span>。売上の伸びに応じて、会社が使っているお金の総額(<b>使用総資本</b>、つまり総資産)などの指標も<b>バランスよく連動しているか</b>を見ることが大事です。</p>
+<p>中でも面白いのが、<b>純資産(自己資本)の成長</b>です。純資産は、資産から負債を引いた、会社が実質的に蓄えている部分で、講義の言葉を借りれば、会社がどれだけ価値を生み出せているかを測る場所です<span class="tag tag-講義">講義</span>。</p>
+<p>ここで、次のような条件を置いてみます。会社の外に出ていくお金は配当だけで、新しく株を発行して資金を集めること(増資)もしない。また、自己資本には評価・換算差額等が含まれない(自己資本＝株主資本)とする。すると、自己資本が一年でどう変わるかは、とても単純な式で書けます。</p>
+
+<div class="yoko box">
+<p class="box-h">サステイナブル成長率</p>
+<p class="f">期末自己資本 ＝ 期首自己資本 ＋ 当期純利益 － 配当</p>
+<p class="f">自己資本成長率 ＝(当期純利益 － 配当)÷ 期首自己資本 ＝ ＲＯＥ ×(１－ 配当性向)</p>
+<p class="cap">ＲＯＥ＝当期純利益÷期首自己資本、配当性向＝配当÷当期純利益。分子と分母を当期純利益でいったん割って掛けると、右の形になる</p>
+</div>
+
+<p>自己資本を増やすのは利益です。けれど、利益のうち配当として株主に渡した分は会社の外に出ていくので、自己資本に残るのは<b>内部留保</b>(当期純利益－配当)だけになります。この増え方の速さが<b>サステイナブル成長率</b>、つまり借金も増資もせずに、自分で稼いだお金だけで会社が持続的に伸びられる速さです。</p>
+<p>ＲＯＥが一〇％で、配当性向が三〇％の会社なら、サステイナブル成長率は一〇％×(一－〇・三)で七％です。式が語っていることはシンプルで、よく稼ぐほど(ＲＯＥが高いほど)、そして稼ぎを配当に回さず会社に残すほど(配当性向が低いほど)、会社は自力で速く成長できます。株主に配当を多く払うことと、会社を速く大きくすることは、引っぱり合いの関係にあるわけです。</p>
+
+<h3 id="ch4-5">利益の「質」と、見えにくい投資</h3>
+<p>成長性を考えるとき、利益が増えたか減ったかだけでなく、その利益が「硬い」かどうかも問題になります。講義では、これを<b>利益の質</b>(クオリティ・オブ・アーニングス)と呼んでいました<span class="tag tag-講義">講義</span>。一時的に出た利益ではなく、継続的に、持続的に出ている利益ほど、質が高いと考えます。</p>
+<p>実証研究(音川 二〇〇八)によれば、日本の企業の<b>利益の持続性は、二〇〇〇年以降低下しています</b>。しかも、<b>経常利益よりも税引前利益の持続性のほうが</b>低下しています。税引前利益には、特別損益という臨時の損得が含まれるからです。講義では、「失われた二十年、三十年」と言われる時代に、日本企業が利益を持続的に生み出せなくなっていたことを示す結果だ、と説明されていました<span class="tag tag-講義">講義</span>。</p>
+<p>もう一つ、<b>研究開発投資</b>についての研究があります(野間 二〇〇六)。研究開発にお金を使うと、その年の利益は減ります。投資家は利益という指標をかなり気にしているので、研究開発に力を入れる会社ほど、目先の利益が小さく見えます。けれど研究開発は、将来の利益の源になる投資です。それにもかかわらず、株式市場では研究開発投資は<b>当初、過小に評価される</b>ことがわかっています。</p>
+<p>なぜ市場は見誤るのか。原因は<b>情報の非対称性</b>、つまり会社の中の人が知っていることと、外の投資家が知っていることの差が大きいからです。研究の中身が将来どのように売上や利益に結びつくのか、会社はうまく伝えきれず、企業秘密として明かせない部分もあります。講義では、企業がもう少し伝える工夫をし、投資家も判断できるようになることが望ましい、と語られていました<span class="tag tag-講義">講義</span>。</p>
+<p>設備投資については、有価証券報告書の「<b>設備の状況</b>」を見ると、何にどれだけ投じているかがわかり、その会社の投資のスタンスが見えてきます。そして「<b>従業員の状況</b>」には、<b>平均年齢と平均勤続年数</b>が載っています。講義では、就職活動で上場企業を受けるなら、ここを見てみるとよい、とすすめられていました<span class="tag tag-講義">講義</span>。人が長く勤めている会社か、若い人が多い会社か。数字が社風まで語ってくれることがあります。</p>
+<p>講義では、伊藤園の有価証券報告書が例に出ていました<span class="tag tag-講義">講義</span>。「提出会社の状況」の欄には、従業員数、平均年齢、平均勤続年数、平均年間給与が一覧で載っています。伊藤園の平均年齢は約四十歳、平均勤続年数は約十七年でした。この十七年は、長いでしょうか、短いでしょうか。</p>
+<p>こう考えてみてください。大学を出て二十二歳で入社し、六十歳で定年を迎える会社なら、働ける年数は三十八年です。では、誰一人辞めない会社の平均勤続年数は三十八年になるでしょうか。なりません。毎年一人ずつ入社するとすれば、社内には一年目の人から三十八年目の人までが一人ずついることになり、その平均は真ん中の十九年です。つまり<b>平均勤続年数は、どんなに長くても二十年弱が現実的な上限</b>なのです。そう考えると、十七年という数字は、ほとんどの人が辞めずに長く勤めている会社だということを物語っています。就職情報サイトのまとめだけでなく、有価証券報告書の原文を一度のぞいてみる価値は、こういうところにあります。</p>
+
+<p>平均年間給与の読み方にも、講義では注意がありました<span class="tag tag-講義">講義</span>。伊藤園は約六百万円で、一見するとそれほど高くは見えません。けれど平均給与は、社員の年齢の構成に左右されます。給与の高い年配の世代が多ければ上がり、若い人が多ければ下がります。一方、三井住友銀行のような金融機関は、平均給与の高さが一目でわかる水準でした。数字を見比べるときは、その数字がどんな人の集まりの平均なのかまで想像することが大切です。</p>
+
+<h3 id="ch4-6">予想は、外れるたびに語る</h3>
+<p>成長性を見るとき、過去の実績だけでなく、会社自身が出す未来の予想も手がかりになります。日本の上場会社は、<b>決算短信</b>の中で、来期の業績の見通しである<b>経営者予想</b>を開示しています。講義によれば、これは欧米にはない、日本の市場の特徴です<span class="tag tag-講義">講義</span>。</p>
+<p>面白いのは、予想が当たったかどうかより、<b>予想をどう改訂したか</b>のほうに情報があることです。期の途中で状況が変われば、会社は予想を上方や下方に修正します。その修正そのものが、会社の中で何が起きているかを外に伝えるサインになるのです。教科書はこれを「予想の改訂の持つ情報内容」と呼んでいます。</p>
+<p>スライドと講義では、アシックスの二年分の数字を追っています<span class="tag tag-講義">講義</span>。数字はいずれも利益(単位:百万円)で、四半期の実績は期首からの累計です。</p>
+
+<div class="yoko box">
+<p class="box-h">アシックスの経営者予想と実績(教科書 図表9-3を年の順に並べ直したもの)</p>
+<table>
+<tr><th></th><th>期首</th><th>1Q</th><th>2Q(中間)</th><th>3Q</th><th>本決算</th></tr>
+<tr><td colspan="6"><b>ある年</b>(前の年の実績 11,046)</td></tr>
+<tr><td>予想</td><td>中間 5,600/通期 13,500</td><td></td><td>通期を<b>11,000に下方修正</b></td><td></td><td></td></tr>
+<tr><td>実績</td><td></td><td class="n">5,174</td><td class="n">5,106</td><td class="n">8,761</td><td class="n">12,617</td></tr>
+<tr><td colspan="6"><b>次の年</b>(前の年の実績 12,617)</td></tr>
+<tr><td>予想</td><td>中間 4,800/通期 12,000</td><td></td><td></td><td>通期を<b>14,000に上方修正</b></td><td>(次の年の予想 中間 5,500/通期 13,500)</td></tr>
+<tr><td>実績</td><td></td><td class="n">4,934</td><td class="n">5,811</td><td class="n">12,519</td><td class="n">13,773</td></tr>
+</table>
+<p class="cap">1Q〜3Qは第1〜第3四半期、実績は期首からの累計。第5回スライド(教科書 図表9-3)と講義の説明をもとに作成</p>
+</div>
+
+<p>最初の年、会社は期の初めに「中間で五十六億円、通期で百三十五億円」の利益を見込んでいました。ところが中間の実績は五十一億円で届かず、会社はこの時点で通期の予想を百十億円へ<b>下方修正</b>しました。結果は百二十六億円で、修正後の予想は上回りました。</p>
+<p>次の年、会社は慎重になったのか、「中間で四十八億円、通期で百二十億円」と控えめな予想を出します。すると第一四半期だけで四十九億円と、中間の予想をもう超えてしまいました。第三四半期の累計が百二十五億円になった時点で、通期の予想を百四十億円へ<b>上方修正</b>し、本決算は百三十八億円でした。</p>
+<p>こうして見ると、経営者予想は「一度出したら終わり」の数字ではなく、会社がそのつど状況を見ながら書き直していく、生きた情報であることがわかります。外れたこと、直したこと、その直し方の一つひとつに、会社の内側の事情がにじみ出ているのです。なお講義では、四半期ごとの開示は義務ではなくなりつつあるものの、会社がいきなりやめるとは考えにくく、年に一度のきちんとした情報を三か月ごとの情報で補う形は続くだろう、という見通しも語られていました<span class="tag tag-講義">講義</span>。</p>
+
+<div class="yoko box">
+<p class="box-h">３月決算の会社の一年(ＩＲカレンダー、教科書 Appendix 9-1)</p>
+<table>
+<tr><th>時期</th><th>出来事</th></tr>
+<tr><td>５月</td><td>前期の通期決算(決算短信)を公表、今期の経営者予想を公表</td></tr>
+<tr><td>６月</td><td>定時株主総会、有価証券報告書</td></tr>
+<tr><td>８月</td><td>第１四半期の決算を公表</td></tr>
+<tr><td>９月末</td><td>中間配当を受け取る権利の確定日</td></tr>
+<tr><td>１１月</td><td>第２四半期(中間)の決算を公表</td></tr>
+<tr><td>２月</td><td>第３四半期の決算を公表</td></tr>
+<tr><td>３月末</td><td>期末配当を受け取る権利の確定日</td></tr>
+</table>
+<p class="cap">講義では、投資家により早く正確な情報を届けるため、株主総会や有価証券報告書の開示を早める会社が増えている、と補足があった[講義]</p>
+</div>
+
+<h3 id="ch4-7">伸びは、やがて平均に戻る</h3>
+<p>さて、冒頭の問いに戻りましょう。去年三割伸びた会社は、今年も三割伸びるのか。</p>
+<p>教科書は、この問いに大量のデータで答えています。日本の上場企業のデータ(日経ＮＥＥＤＳ)から、金融・証券・保険業を除いた三月決算の会社を集めます。金融業は会計の仕組みが特殊なので、分析ではふつう除きます<span class="tag tag-講義">講義</span>。そのうえで、次の手順でグラフを作ります。</p>
+<ol>
+<li>ベース年度(〇期)を一九九二年、一九九七年、二〇〇二年、二〇一二年に置く。</li>
+<li>ベース年度の会社を、売上高成長率の低い順に並べて、十のグループ(ポートフォリオ)に分ける。</li>
+<li>グループの顔ぶれを変えずに、各グループの売上高成長率の<b>中央値</b>を、ベース年度から五期先まで追いかける。</li>
+<li>四つのベース年度で同じことをし、各期の中央値を平均してグラフにする。</li>
+</ol>
+<p>四つのベース年度それぞれから五年分を追いかけるので、データは延べ<b>四万五千五百二企業・年</b>になります。</p>
+
+<figure class="yoko" id="fig10">
+<svg viewBox="0 0 460 240" role="img" aria-label="ベース年度に成長率が高かったグループも低かったグループも、1年後以降は似た水準に集まる">
+<line x1="50" y1="200" x2="440" y2="200" class="ax"/><line x1="50" y1="20" x2="50" y2="200" class="ax"/>
+<g class="t-s" text-anchor="middle"><text x="70" y="218">0期</text><text x="140" y="218">＋1</text><text x="210" y="218">＋2</text><text x="280" y="218">＋3</text><text x="350" y="218">＋4</text><text x="420" y="218">＋5</text></g>
+<text x="14" y="110" class="t-s" text-anchor="middle" transform="rotate(-90 14 110)">売上高成長率</text>
+<line x1="50" y1="150" x2="440" y2="150" class="dash"/><text x="438" y="145" class="t-s" text-anchor="end">0%</text>
+<polyline points="70,35 140,120 210,128 280,140 350,130 420,118" class="acc"/>
+<polyline points="70,62 140,124 210,130 280,142 350,132 420,120" class="acc" opacity=".55"/>
+<polyline points="70,175 140,138 210,135 280,146 350,134 420,121" class="shu" opacity=".55"/>
+<polyline points="70,190 140,140 210,136 280,148 350,136 420,123" class="shu"/>
+<text x="78" y="32" class="t-s">成長率が高かったグループ</text>
+<text x="78" y="196" class="t-s">成長率が低かったグループ</text>
+</svg>
+<figcaption>図10　成長率の平均回帰(教科書 図表9-4の形の模式。線の位置は数値ではなく傾向を示す)</figcaption>
+</figure>
+
+<p>結果は、図のような形になります。ベース年度に売上高成長率が飛び抜けて高かったグループ(講義によれば中央値で二七〜二八％ほど)も、マイナスに沈んでいたグループ(－六〜七％ほど)も、<b>一年後にはほとんど同じ水準に集まってしまう</b>のです<span class="tag tag-講義">講義</span>。その後も、多少の幅はありながら、どのグループも似たところに落ち着いていきます。</p>
+<p>ＲＯＥで同じことをしても(図表9-5)、結果は変わりません。ＲＯＥが高かったグループは下がり、低かったグループは上がって、幅がどんどん狭まっていきます。</p>
+<p>この現象を<b>平均回帰</b>といいます。講義では「覚えておくといい」と念を押されていました<span class="tag tag-講義">講義</span>。売上高成長率やＲＯＥに限らず、さまざまな指標で確かめられている現象です。良いところがずっと良いわけではなく、悪いところがずっと悪いわけでもない。</p>
+<p>なぜそうなるのでしょうか。ある年に極端に高い成長率が出るのは、その年にたまたま大きな注文が入った、ライバルが失敗した、といった一時的な追い風が重なっていることが多いからです。追い風はいつまでも吹きません。逆に、極端に悪い年も、一時的な逆風や大きな損失の処理が重なっていることが多く、翌年にはその分だけ持ち直します。それに、もうかる市場には新しい競争相手が集まり、利益の厚みは少しずつ削られていきます<span class="tag tag-補足">補足</span>。</p>
+<p>だから、成長性の指標を見るときは、<b>今年の伸びをそのまま将来に引き伸ばしてはいけない</b>のです。去年三割伸びた会社が、今年も三割伸びると考えるのは、多くの場合、楽観がすぎます。数字は、ある程度のところに落ち着いていく。そういう前提で分析する必要があります。</p>
+<p>ところで、この章で見てきたのは売上や利益の「大きさ」の伸びでした。けれど、売上が大きければ、それだけ会社は価値を生んでいることになるのでしょうか。次の章では、売上の中身に分け入ります。</p>
+
+<div class="end">
+<p class="end-h">この章の核心</p>
+<ol>
+<li>伸びは前期比・趨勢比・年平均成長率で測る。年平均成長率は伸びを掛け算でとらえる幾何平均で、単純な割り算(算術平均)ではない。趨勢比はベース年度の選び方で見え方が変わる。</li>
+<li>売上の伸びはベンチマーク(同業他社・経済指標)と比べ、受注の動きで先を読む。自力で伸びられる速さはサステイナブル成長率＝ＲＯＥ×(１－配当性向)。</li>
+<li>経営者予想は改訂そのものに情報がある。そして成長率やＲＯＥは、高いところも低いところも平均に回帰する。</li>
+</ol>
+<p class="end-h">キーワード</p>
+<p class="kw">業績の推移／成長性分析／前期比／趨勢比／ベース年度／年平均成長率／幾何平均／算術平均／売上高成長率／増収率／ベンチマーク／セグメント情報／生産、受注及び販売の状況／受注残高／使用総資本／内部留保／サステイナブル成長率／ＲＯＥ／配当性向／利益の質／利益の持続性／研究開発投資／情報の非対称性／設備の状況／従業員の状況／平均勤続年数／決算短信／経営者予想／予想の改訂／上方修正／下方修正／ＩＲカレンダー／ポートフォリオ／中央値／平均回帰</p>
+<p class="end-h">考えてみよう</p>
+<ol>
+<li>年平均成長率を求めるとき、各年の前期比を単純に平均してはいけないのはなぜか。具体的な数値例を使って説明しなさい。</li>
+<li>上場企業を売上高成長率で十のグループに分けて追跡すると、どのような傾向が見られるか。その現象の名前と、分析をするうえでの教訓を述べなさい。</li>
+</ol>
+</div>
+
+</section>
+
+<section class="chapter" id="ch5" data-title="会社は何を生み出したか" data-src="第6回・教科書第10章">
+<h2 class="ch-title"><span class="ch-no">第五章</span>会社は何を生み出したか</h2>
+
+<p class="lead">売上高一千億円の卸売会社と、売上高三百億円のソフトウェア会社。どちらが社会により多くの価値を生み出しているだろうか。売上の大きさだけで決めてよいのだろうか。</p>
+
+<h3 id="ch5-1">売上の中には、他人の仕事が入っている</h3>
+<p>町のパン屋さんを思い浮かべてください。小麦粉とバターと卵を三万円で仕入れて、パンを焼き、十万円分を売りました。売上は十万円です。けれど、その十万円のうち三万円分は、小麦農家や製粉会社や酪農家が生み出した価値です。パン屋さんが<b>自分の手で新しく生み出した価値</b>は、差し引き七万円です。</p>
+<p>これが<b>付加価値</b>です。教科書は、付加価値を「外部から購入した原材料、部品、サービスをもとにして、企業が経済活動によって新しく生みだした価値」と定義しています。講義では、企業は人・物・金・情報という経営資源を使い、外から買ってきた物に価値を付け加えて売る、その「付け加えた分」が付加価値だ、と説明されていました<span class="tag tag-講義">講義</span>。</p>
+<p>冒頭の問いに戻ると、売上高一千億円の卸売会社は、九百五十億円で商品を仕入れて右から左へ流しているかもしれません。そうなら、自分で生み出した価値は五十億円です。一方、売上高三百億円のソフトウェア会社は、外から買うものがほとんどなく、二百五十億円を自分たちの手で生み出しているかもしれません。売上の大きさと、生み出した価値の大きさは、まったく別のものなのです<span class="tag tag-補足">補足</span>。</p>
+
+<h3 id="ch5-2">二つの数え方 ― 引くか、足すか</h3>
+<p>付加価値の計算方法は二つあります。</p>
+<p>一つは<b>控除法</b>です。売上高から、外部から受け入れた購入額を差し引きます。パン屋さんの計算と同じで、「全体から他人の分を引く」やり方です。</p>
+<p>もう一つは<b>加算法</b>です。生み出した価値が、最終的にだれの手に渡ったかを足し上げます。足すのは、<b>人件費、賃借料、金融費用、減価償却費、税金、税引後利益</b>の六つです。</p>
+
+<figure class="yoko" id="fig12">
+<svg viewBox="0 0 460 250" role="img" aria-label="控除法は売上高から外部購入額を引く。加算法は付加価値の行き先6つを足す">
+<text x="100" y="18" class="t-h" text-anchor="middle">控除法</text>
+<rect x="40" y="28" width="120" height="70" class="f-box"/><text x="100" y="58" class="t-s" text-anchor="middle">外部から購入した</text><text x="100" y="74" class="t-s" text-anchor="middle">原材料・部品など</text>
+<rect x="40" y="98" width="120" height="132" class="f-a"/><text x="100" y="168" class="t-h" text-anchor="middle">付加価値</text>
+<text x="20" y="130" class="t-s" text-anchor="middle" transform="rotate(-90 20 130)">売上高</text>
+<line x1="30" y1="28" x2="30" y2="230" class="ax"/>
+<text x="330" y="18" class="t-h" text-anchor="middle">加算法(行き先を足す)</text>
+<g>
+<rect x="250" y="98" width="160" height="30" class="f-c"/><text x="330" y="118" class="t-s" text-anchor="middle">人件費 → 従業員へ</text>
+<rect x="250" y="128" width="160" height="16" class="f-c"/><text x="330" y="140" class="t-s" text-anchor="middle">賃借料 → 貸し手へ</text>
+<rect x="250" y="144" width="160" height="16" class="f-c"/><text x="330" y="156" class="t-s" text-anchor="middle">金融費用 → 債権者へ</text>
+<rect x="250" y="160" width="160" height="22" class="f-c"/><text x="330" y="175" class="t-s" text-anchor="middle">減価償却費 → 設備の消耗分</text>
+<rect x="250" y="182" width="160" height="18" class="f-c"/><text x="330" y="195" class="t-s" text-anchor="middle">税金 → 国・自治体へ</text>
+<rect x="250" y="200" width="160" height="30" class="f-c"/><text x="330" y="219" class="t-s" text-anchor="middle">税引後利益 → 株主・会社へ</text>
+</g>
+<line x1="165" y1="164" x2="245" y2="164" class="ln" marker-end="url(#ar5)"/>
+<defs><marker id="ar5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--ink-soft)"/></marker></defs>
+<text x="205" y="156" class="t-s" text-anchor="middle">同じもの</text>
+</svg>
+<figcaption>図12　付加価値の二つの計算方法。控除法は「全体から他人の分を引く」、加算法は「生み出した価値の行き先を足す」[新規作図](項目は第6回スライドより、大きさは模式)</figcaption>
+</figure>
+
+<p>加算法の六つの項目は、付加価値の「行き先」のリストだと考えると覚えやすくなります。人件費は働いた従業員へ、賃借料は土地や建物の貸し手へ、金融費用(支払利息)はお金を貸した銀行などへ、税金は国や自治体へ、税引後利益は株主と会社自身へ渡ります。減価償却費は、価値を生み出すのに使った設備のすり減った分です。会社が生み出した価値を、第一章で見た利害関係者たちが分け合っている。付加価値は、その分け前の合計なのです。</p>
+<p>調査機関の統計は、ほぼこの<b>加算法</b>で計算されています。三菱総合研究所の『企業経営の分析』、日本経済新聞社の『日経経営指標』、日本政策投資銀行の『産業別財務データハンドブック』などがその例です<span class="tag tag-講義">講義</span>。</p>
+<p>スライドには、セコムの有価証券報告書から加算法で付加価値を計算した例が載っています(教科書 図表10-2、個別財務諸表、単位:百万円)。</p>
+
+<div class="yoko box">
+<p class="box-h">セコムの付加価値(加算法)</p>
+<table>
+<tr><th>項目</th><th>2013年3月期</th><th>2012年3月期</th></tr>
+<tr><td>人件費(労務費・給料手当・賞与・退職給付費用・役員退職慰労引当金繰入額・法定福利費)</td><td class="n">77,149</td><td class="n">75,050</td></tr>
+<tr><td>賃借料</td><td class="n">10,404</td><td class="n">10,529</td></tr>
+<tr><td>財務費用(支払利息)</td><td class="n">325</td><td class="n">325</td></tr>
+<tr><td>減価償却費</td><td class="n">27,495</td><td class="n">27,690</td></tr>
+<tr><td>税金費用(租税公課・法人税等合計)</td><td class="n">28,863</td><td class="n">32,012</td></tr>
+<tr><td>当期純利益</td><td class="n">49,128</td><td class="n">26,818</td></tr>
+<tr class="sum"><td>粗付加価値</td><td class="n">193,364</td><td class="n">172,424</td></tr>
+<tr><td>従業員数(期中平均)</td><td class="n">14,908人</td><td class="n">14,281人</td></tr>
+</table>
+<p class="cap">スライドの内訳を項目ごとに合計して作成。減価償却費を含む付加価値を「粗付加価値」と呼ぶ</p>
+</div>
+
+<h3 id="ch5-3">一人あたり、どれだけ生み出したか</h3>
+<p>付加価値の総額は、会社が大きくなれば自然と大きくなります。会社の「生み出す力」を比べるには、規模をそろえる必要があります。そこで、従業員一人あたりに直します。</p>
+
+<div class="yoko box">
+<p class="box-h">労働生産性</p>
+<p class="f">労働生産性 ＝ 付加価値 ÷ 従業員数</p>
+</div>
+
+<p><b>労働生産性</b>は、従業員一人あたり(インプット)に対して、どれだけの付加価値(アウトプット)を生み出したかを表す指標です。スライドの例では、セコムの二〇〇七年三月期は付加価値二千七十六億円を一万二千八百九十九人で生み出し、一人あたり約千六百十万円でした。外食チェーンのサイゼリヤの二〇一七年八月期は、一人あたり約千八百六十万円です。</p>
+
+<div class="yoko box">
+<p class="box-h">労働生産性の例(単位:百万円)</p>
+<table>
+<tr><th>会社・期</th><th>付加価値 ÷ 従業員数</th><th>労働生産性</th></tr>
+<tr><td>セコム 2007年3月期</td><td class="n">207,662 ÷ 12,899人</td><td class="n">16.10</td></tr>
+<tr><td>セコム 2008年3月期</td><td class="n">215,297 ÷ 13,195人</td><td class="n">16.32</td></tr>
+<tr><td>サイゼリヤ 2017年8月期</td><td class="n">79,458 ÷ 4,276人</td><td class="n">18.58</td></tr>
+<tr><td>サイゼリヤ 2018年8月期</td><td class="n">74,756 ÷ 4,341人</td><td class="n">17.22</td></tr>
+</table>
+</div>
+
+<p>数字が出たら、次は「なぜその水準なのか」を問います。講義では、ＲＯＥやＲＯＡを分解して原因を探るのと同じように、労働生産性も分解できる、と説明されていました<span class="tag tag-講義">講義</span>。分母と分子の間に売上高をはさむのです。</p>
+
+<figure class="yoko" id="fig13">
+<svg viewBox="0 0 460 230" role="img" aria-label="労働生産性は付加価値率と一人当たり売上高の積、労働分配率は一人当たり人件費を労働生産性で割ったもの">
+<rect x="160" y="10" width="140" height="36" class="f-a"/><text x="230" y="33" class="t-h" text-anchor="middle">労働生産性</text>
+<line x1="200" y1="46" x2="110" y2="76" class="ln"/><line x1="260" y1="46" x2="350" y2="76" class="ln"/>
+<text x="230" y="70" class="t-h" text-anchor="middle">＝　　×</text>
+<rect x="30" y="76" width="160" height="40" class="f-c"/><text x="110" y="93" class="t-s" text-anchor="middle">付加価値率</text><text x="110" y="109" class="t-s" text-anchor="middle">付加価値 ÷ 売上高</text>
+<rect x="270" y="76" width="160" height="40" class="f-c"/><text x="350" y="93" class="t-s" text-anchor="middle">一人当たり売上高</text><text x="350" y="109" class="t-s" text-anchor="middle">売上高 ÷ 従業員数</text>
+<rect x="160" y="146" width="140" height="36" class="f-b"/><text x="230" y="169" class="t-h" text-anchor="middle">労働分配率</text>
+<line x1="200" y1="182" x2="110" y2="196" class="ln"/><line x1="260" y1="182" x2="350" y2="196" class="ln"/>
+<text x="230" y="205" class="t-h" text-anchor="middle">＝　　÷</text>
+<rect x="30" y="196" width="160" height="30" class="f-c"/><text x="110" y="216" class="t-s" text-anchor="middle">一人当たり人件費</text>
+<rect x="270" y="196" width="160" height="30" class="f-a"/><text x="350" y="216" class="t-s" text-anchor="middle">労働生産性(上と同じ)</text>
+</svg>
+<figcaption>図13　労働生産性と労働分配率の分解[新規作図](式は第6回スライドより)</figcaption>
+</figure>
+
+<div class="yoko box">
+<p class="box-h">労働生産性の分解</p>
+<p class="f">付加価値 ÷ 従業員数 ＝(付加価値 ÷ 売上高)×(売上高 ÷ 従業員数)</p>
+<p class="f">労働生産性 ＝ 付加価値率 × 従業員一人当たり売上高</p>
+</div>
+
+<p>労働生産性が高まっているかどうかは、<b>売上高に占める付加価値の割合(付加価値率)が高まっているか、従業員一人当たり売上高が上がっているか、あるいはその両方か</b>で決まります。</p>
+<p>この分解は、会社の性格をくっきり見せてくれます。冒頭の卸売会社は、一人あたりの売上はとても大きいけれど、付加価値率は低い。ソフトウェア会社は逆に、付加価値率がとても高い。同じ労働生産性でも、そこへの登り方が違うのです。</p>
+<div class="yoko box calc">
+<p class="box-h">同じ労働生産性、違う登り方(架空の例)</p>
+<table>
+<tr><th></th><th>付加価値率</th><th>一人当たり売上高</th><th>労働生産性</th></tr>
+<tr><td>卸売のＡ社</td><td class="n">10%</td><td class="n">2億円</td><td class="n">0.1×2億＝2,000万円</td></tr>
+<tr><td>ソフトのＢ社</td><td class="n">50%</td><td class="n">4,000万円</td><td class="n">0.5×4,000万＝2,000万円</td></tr>
+</table>
+</div>
+<p>Ａ社が生産性を上げたいなら、仕入れを工夫して付加価値率を少しでも上げるのが効きます。Ｂ社なら、一人がより多くの製品を売れるようにするのが近道です。分解すると、打つべき手まで見えてくるのです。分析するときは、労働生産性が高い(低い)なら、それが付加価値率のせいなのか、一人当たり売上高のせいなのかを見分けます。</p>
+
+<h3 id="ch5-4">生み出した価値を、どれだけ人に配ったか</h3>
+<p>生み出した価値は、だれにどれだけ配られたのでしょうか。従業員に注目した指標が<b>労働分配率</b>です。</p>
+
+<div class="yoko box">
+<p class="box-h">労働分配率</p>
+<p class="f">労働分配率(％)＝ 人件費 ÷ 付加価値 × 100</p>
+<table>
+<tr><th>会社・期</th><th>人件費 ÷ 付加価値</th><th>労働分配率</th></tr>
+<tr><td>セコム 2007年3月期</td><td class="n">87,955 ÷ 207,662</td><td class="n">42.4%</td></tr>
+<tr><td>セコム 2008年3月期</td><td class="n">92,637 ÷ 215,297</td><td class="n">43.0%</td></tr>
+<tr><td>サイゼリヤ 2017年8月期</td><td class="n">43,926 ÷ 79,458</td><td class="n">55.3%</td></tr>
+<tr><td>サイゼリヤ 2018年8月期</td><td class="n">41,765 ÷ 74,756</td><td class="n">55.9%</td></tr>
+</table>
+</div>
+
+<p>セコムは、生み出した付加価値のおよそ四割を給料として従業員に渡しています。サイゼリヤは、半分以上を人件費に回しています<span class="tag tag-講義">講義</span>。店で料理を作り、運び、片づける人の手がたくさん要る外食業では、分配率が高くなるのは自然なことです。業種によって水準が大きく違うので、労働分配率も同業他社と比べて見るのが基本です。</p>
+<p>労働分配率も、分母と分子の間に従業員数をはさむと分解できます。</p>
+
+<div class="yoko box">
+<p class="box-h">労働分配率の分解</p>
+<p class="f">人件費 ÷ 付加価値 ＝(人件費 ÷ 従業員数)÷(付加価値 ÷ 従業員数)</p>
+<p class="f">労働分配率 ＝ 一人当たり人件費 ÷ 労働生産性</p>
+</div>
+
+<p>分配率が上がったときは、一人当たりの人件費が上がったのか、それとも労働生産性が下がったのか、を見分けます<span class="tag tag-講義">講義</span>。同じ「分配率の上昇」でも、前者なら賃上げ、後者なら稼ぐ力の低下で、意味はまったく違います。</p>
+<p>スライドのサイゼリヤの数字で、実際に確かめてみましょう。二〇一七年八月期から二〇一八年八月期にかけて、労働分配率は五五・三％から五五・九％へ少し上がりました。給料を上げたのでしょうか。</p>
+<div class="yoko box calc">
+<p class="box-h">サイゼリヤの労働分配率が上がった理由(単位:百万円、スライドの数値から計算)</p>
+<table>
+<tr><th></th><th>2017年8月期</th><th>2018年8月期</th><th>変化</th></tr>
+<tr><td>一人当たり人件費</td><td class="n">43,926÷4,276＝10.27</td><td class="n">41,765÷4,341＝9.62</td><td class="n">約6.3%減</td></tr>
+<tr><td>労働生産性</td><td class="n">18.58</td><td class="n">17.22</td><td class="n">約7.3%減</td></tr>
+<tr class="sum"><td>労働分配率</td><td class="n">55.3%</td><td class="n">55.9%</td><td class="n">上昇</td></tr>
+</table>
+</div>
+<p>一人当たりの人件費は、むしろ減っていました。それなのに分配率が上がったのは、労働生産性のほうがそれ以上に下がったからです。付加価値が減ったのに、人は増えていました。数字の上では「人への分配が増えた」ように見えても、中身は「稼ぐ力が落ちて、相対的に人件費の重みが増した」のです。分解しなければ、正反対の結論を出していたかもしれません。</p>
+<p>この式は、ニュースでよく聞く賃上げの議論の芯をついています。給料(一人当たり人件費)を上げても、それ以上に労働生産性が上がれば、分配率は下がり、会社の取り分も減りません。逆に、生産性が上がらないまま給料だけを上げれば、分配率が上がり、会社の利益が削られます。賃上げを長く続けられるかどうかは、結局のところ、一人がどれだけ価値を生み出せるかにかかっているのです<span class="tag tag-補足">補足</span>。</p>
+
+<h3 id="ch5-5">見落としていたコスト</h3>
+<p>ここまでで、会社が生み出した価値と、その分け方を測る道具がそろいました。けれど、ひとつ気になることがあります。</p>
+<p>加算法の行き先のリストには、銀行に払う利息(金融費用)は入っていますが、株主に払うべきものは「税引後利益」として残りがまとめて入っているだけでした。株主は、自分のお金を会社に預けています。そのお金は、ただで使ってよいのでしょうか。銀行に預けておけば利息がつき、ほかの会社の株を買えば配当がもらえたはずのお金です。</p>
+<p>会社がお金を使うことには、目に見えないコストがある。そのコストを差し引いても、本当に価値を生んだと言えるのか。次の章では、お金そのものの「値段」を考えます。</p>
+
+<div class="end">
+<p class="end-h">この章の核心</p>
+<ol>
+<li>付加価値は、外部から買ったものをもとに会社が新しく生み出した価値。売上高から外部購入額を引く控除法と、人件費・賃借料・金融費用・減価償却費・税金・税引後利益を足す加算法がある(調査機関は加算法)。</li>
+<li>労働生産性＝付加価値÷従業員数＝付加価値率×従業員一人当たり売上高。分解すると、高い(低い)理由がわかる。</li>
+<li>労働分配率＝人件費÷付加価値＝一人当たり人件費÷労働生産性。業種で水準が違い、上昇の理由が賃上げか生産性の低下かを見分ける。</li>
+</ol>
+<p class="end-h">キーワード</p>
+<p class="kw">付加価値／経営資源／控除法／加算法／人件費／賃借料／金融費用／減価償却費／税金／税引後利益／粗付加価値／労働生産性／付加価値率／従業員一人当たり売上高／労働分配率／一人当たり人件費</p>
+<p class="end-h">考えてみよう</p>
+<ol>
+<li>付加価値の控除法と加算法を説明し、加算法の各項目がそれぞれだれへの分配にあたるかを述べなさい。</li>
+<li>ある会社の労働分配率が前の年より上がった。考えられる原因を、分解式を使って二つ述べなさい。</li>
+</ol>
+</div>
+</section>
+
+<section class="chapter" id="ch6" data-title="お金にも値段がある" data-src="第6回・教科書第10章(＋第1章 資本コストとの比較)">
+<h2 class="ch-title"><span class="ch-no">第六章</span>お金にも値段がある</h2>
+
+<p class="lead">黒字の会社が、実は価値を壊していることがある。そんなことがありうるだろうか。もしありうるなら、利益のほかに何を見落としているのだろうか。</p>
+
+<h3 id="ch6-1">利益が出ていても、損をしていることがある</h3>
+<p>手元に一千万円あるとしましょう。友人の店に出資したら、一年後に二十万円の利益が出ました。利益は二％です。めでたい話に聞こえます。けれど、もし同じ一千万円を、ほぼ確実に五％の利回りが得られる別の投資に回せたとしたらどうでしょう。友人の店に出したことで、あなたは五十万円得られたはずの機会を捨てて、二十万円しか得られなかったことになります。帳簿の上では黒字でも、実質的には三十万円の損です<span class="tag tag-補足">補足</span>。</p>
+<p>会社も同じです。会社が事業に使うお金は、銀行から借りたものであれ、株主から預かったものであれ、ただではありません。その「お金の値段」を差し引いても、なお利益が残るか。それを測るのが<b>経済的付加価値</b>(<b>ＥＶＡ</b>、economic value added)です。</p>
+
+<div class="yoko box">
+<p class="box-h">経済的付加価値(教科書 式10.1)</p>
+<p class="f">経済的付加価値 ＝ 税引後営業利益 － 加重平均資本コスト(％)× 期首投下資本</p>
+</div>
+
+<p>右側の「加重平均資本コスト×期首投下資本」が、事業に投じたお金(投下資本)にかかる値段の総額です。会社はお金を集めてきて、それを運用して利益を得ます。その利益が、お金を集めるのにかかったコストをどれだけ上回ったか。講義では、ＥＶＡはスターン・スチュワート社が広めた指標で、日本ではそれほど流行らなかったものの、世界的には多くの大企業で業績評価の指標として使われてきた、と紹介されていました<span class="tag tag-講義">講義</span>。</p>
+<p>第一章で、比較基準の一つに「資本コストとの比較」が挙がっていたのを覚えているでしょうか。ＥＶＡは、まさにそれを一つの数字にしたものです。では、その資本コストとは何なのか。ここからが本題です。</p>
+
+<h3 id="ch6-2">資本コストの三つの顔</h3>
+<p>教科書は、<b>資本コスト</b>(cost of capital)を三つの言い方で説明しています。</p>
+<p>一つめは、<b>資本の利用から生じる価値犠牲</b>です。お金を集めて使うことで、何かを犠牲にしている。その犠牲の大きさが資本コストです。冒頭の出資の例でいえば、捨てた五％の利回りがそれにあたります。</p>
+<p>二つめは、<b>現在価値に割り引くための割引率</b>です。講義では、こんな問いかけがありました<span class="tag tag-講義">講義</span>。今日百万円をもらうのと、一年後に百万円をもらうのと、どちらを選びますか。一％の利息がつく口座があれば、今日の百万円は一年後に百一万円になります。つまり、今日の百万円と一年後の百一万円は同じ価値で、今日の百万円と一年後の百万円なら、今日のほうが価値があるのです。お金は時間とともに価値を生む。この「時間の値段」を表す率が割引率で、会社の値打ちを計算する方法(ＤＣＦ法など、後半の授業で扱います)では、この割引率に資本コストを使います。</p>
+<p>三つめは、<b>投資案の採否を決定するための切捨率</b>です。これも講義の例がわかりやすいでしょう<span class="tag tag-講義">講義</span>。一％のコストでお金を集めた会社に、二・五％のリターンが見込める投資案が来たら、差し引きプラスなので実行してよい。けれど〇・八％のリターンの案なら、利益は出ても、集めたお金のコスト一％を下回るので、正味では〇・二％のマイナスです。資本コストは、「これを下回る投資はやらない」という線引きになるのです。</p>
+
+<h3 id="ch6-3">だれに払うコストなのか</h3>
+<p>会社のお金の集め方は、大きく四つあります。それぞれに、払うべきコストがあります。</p>
+
+<div class="yoko box">
+<p class="box-h">資金の集め方とそのコスト</p>
+<table>
+<tr><th>集め方</th><th>コスト</th></tr>
+<tr><td>銀行からの借入</td><td>利息</td></tr>
+<tr><td>社債の発行</td><td>利息</td></tr>
+<tr><td>新株の発行</td><td>配当金</td></tr>
+<tr><td>利益の留保</td><td>他に投資した場合の利益</td></tr>
+</table>
+</div>
+
+<p>最後の行が、この章でいちばん大切なところです。会社が稼いだ利益を配当せずに社内に残す(内部留保)と、帳簿の上ではコストがかからないように見えます。けれど、そのお金を株主に配っていれば、株主はそれをほかの会社に投資して利益を得られたはずです。その得られたはずの利益が、内部留保のコストです。講義では、計算上はすぐには出てこないけれど、これも一種の<b>機会損失</b>としてのコストだ、と説明されていました<span class="tag tag-講義">講義</span>。</p>
+<p>では、銀行から借りるお金と、株主に出してもらうお金では、どちらが高くつくでしょうか。答えは、<b>株主のお金</b>です<span class="tag tag-講義">講義</span>。</p>
+<p>銀行は債権者です。会社の業績がどうなろうと、「貸したお金は返しなさい」と言えます。会社にとっては、必ず返さなければならないお金です。一方、株主が出したお金は、会社がつぶれても「返せ」とは言えません。株主は、会社と一緒にリスクを背負ってくれているのです。こうしたお金を<b>リスクマネー</b>と呼びます。リスクを背負う分、株主は銀行の利息よりも高いリターン(配当や株価の上昇)を期待します。だから、株主資本のコストは負債のコストより高くなるのが一般的なのです。</p>
+<p>ちなみに、株主は出資した額以上の責任を負いません。会社が借金を残してつぶれても、株主が肩代わりを求められることはありません。これを<b>有限責任</b>といいます。損をしても出資した額まで、という安心があるからこそ、人は株主になれるのです<span class="tag tag-講義">講義</span>。</p>
+
+<h3 id="ch6-4">重みをつけて平均する</h3>
+<p>集め方ごとにコストが違うので、会社全体のお金の値段は、それぞれのコストを<b>集めた金額の構成比で重みづけして平均</b>します。これが<b>加重平均資本コスト</b>(<b>ＷＡＣＣ</b>、Weighted Average Cost of Capital)です。スライドの計算例で見てみましょう。</p>
+
+<div class="yoko box calc">
+<p class="box-h">資本コストの計算例(借入金70億円・6％、社債50億円・8％、資本金60億円・10％、内部留保20億円・12％)</p>
+<table>
+<tr><th>資本源泉</th><th>金額</th><th>資本構成</th><th>コスト率</th><th>平均資本コスト</th></tr>
+<tr><td>借入金</td><td class="n">70億円</td><td class="n">35%</td><td class="n">6%</td><td class="n">0.35×6＝2.1%</td></tr>
+<tr><td>社債</td><td class="n">50億円</td><td class="n">25%</td><td class="n">8%</td><td class="n">0.25×8＝2.0%</td></tr>
+<tr><td>資本金</td><td class="n">60億円</td><td class="n">30%</td><td class="n">10%</td><td class="n">0.30×10＝3.0%</td></tr>
+<tr><td>内部留保</td><td class="n">20億円</td><td class="n">10%</td><td class="n">12%</td><td class="n">0.10×12＝1.2%</td></tr>
+<tr class="sum"><td>合計</td><td class="n">200億円</td><td class="n">100%</td><td></td><td class="n">8.3%</td></tr>
+</table>
+<p class="cap">第6回スライドの空欄を埋めたもの。資本構成は各金額÷合計200億円</p>
+</div>
+
+<figure class="yoko" id="fig14">
+<svg viewBox="0 0 460 230" role="img" aria-label="横幅を資本構成、高さをコスト率とした長方形の面積の合計が加重平均資本コスト8.3%">
+<line x1="40" y1="190" x2="440" y2="190" class="ax"/><line x1="40" y1="190" x2="40" y2="30" class="ax"/>
+<g class="t-s" text-anchor="end"><text x="35" y="194">0%</text><text x="35" y="130">5%</text><text x="35" y="70">10%</text></g>
+<rect x="40" y="118" width="140" height="72" class="f-c"/><text x="110" y="160" class="t-s" text-anchor="middle">借入金 35%×6%</text>
+<rect x="180" y="94" width="100" height="96" class="f-c"/><text x="230" y="146" class="t-s" text-anchor="middle">社債 25%×8%</text>
+<rect x="280" y="70" width="120" height="120" class="f-b"/><text x="340" y="134" class="t-s" text-anchor="middle">資本金 30%×10%</text>
+<rect x="400" y="46" width="40" height="144" class="f-b"/><text x="420" y="40" class="t-s" text-anchor="middle">留保</text>
+<line x1="40" y1="90.4" x2="440" y2="90.4" class="dash"/><text x="44" y="84" class="t-h">加重平均 8.3%</text>
+<g class="t-s" text-anchor="middle"><text x="110" y="206">負債(他人資本)</text><text x="360" y="206">株主のお金(自己資本)</text></g>
+</svg>
+<figcaption>図14　加重平均資本コストのイメージ。横幅が資本構成、高さがコスト率で、面積の合計(を全体の幅でならした高さ)が8.3%[新規作図](数値:第6回スライドの計算例)</figcaption>
+</figure>
+
+<p>図にすると、株主のお金(右側)ほど背が高い、つまりコストが高いことが一目でわかります。会社全体のお金の値段は、その凸凹をならした高さ、八・三％です。この会社は、事業に投じたお金で年に八・三％以上を稼がなければ、お金を出した人たちの期待に応えられないことになります。</p>
+<p>記号で書くと、負債をＤ、株主資本をＥ、負債コストをＲ<sub>Ｄ</sub>、株主資本コストをＲ<sub>Ｅ</sub>として、次のようになります。</p>
+
+<div class="yoko box">
+<p class="box-h">加重平均資本コスト</p>
+<p class="f">Ｒ<sub>Ｖ</sub> ＝ Ｄ/(Ｄ＋Ｅ)× Ｒ<sub>Ｄ</sub> ＋ Ｅ/(Ｄ＋Ｅ)× Ｒ<sub>Ｅ</sub></p>
+</div>
+
+<h3 id="ch6-5">借金には「節税効果」がある</h3>
+<p>ここで一つ、借金にだけある特別な事情を加えます。会社が銀行に払う利息は、費用として利益から差し引かれます。利益が減れば、その分だけ法人税も減ります。税率が四〇％の会社が百万円の利息を払うと、税金が四十万円安くなるので、実質の負担は六十万円で済むのです。スライドの言葉でいえば、<b>「借入には節税効果がある」</b>。</p>
+<p>だから、負債コストは(１－税率)を掛けた<b>税引後</b>の値で考えます。講義では、「利息を払う→費用が増える→利益が減る→税金が減る」という流れを順番に押さえれば式は自然に出てくること、そして会社の税率はかなり高いので、この節税効果は意外と大きなインパクトを持つことが強調されていました<span class="tag tag-講義">講義</span>。式の中のｔは、四〇％なら〇・四のように小数で入れます。</p>
+
+<div class="yoko box">
+<p class="box-h">加重平均資本コスト(税引後、ｔは法人税率＝実効税率)</p>
+<p class="f">Ｒ<sub>Ｖ</sub> ＝ Ｄ/(Ｄ＋Ｅ)×(１－ｔ)× Ｒ<sub>Ｄ</sub> ＋ Ｅ/(Ｄ＋Ｅ)× Ｒ<sub>Ｅ</sub></p>
+</div>
+
+<div class="yoko box calc">
+<p class="box-h">例題　ＷＡＣＣを求めよ(負債総額1,000億円、株主資本1,000億円、負債コスト3.0％、株主資本コスト7.0％、税率40％)</p>
+<table>
+<tr><td>負債の比率 ＝ 1,000÷2,000</td><td class="n">0.5</td></tr>
+<tr><td>負債側 ＝ 0.5 ×(1－0.4)× 3.0％</td><td class="n">0.9%</td></tr>
+<tr><td>株主資本側 ＝ 0.5 × 7.0％</td><td class="n">3.5%</td></tr>
+<tr class="sum"><td>ＷＡＣＣ</td><td class="n">4.4%</td></tr>
+</table>
+</div>
+
+<p>税金を考えなければ、ＷＡＣＣは〇・五×三％＋〇・五×七％で五・〇％です。節税効果のおかげで、〇・六％分お金の値段が安くなりました。借金は、株主のお金より安く、しかも税金まで減らしてくれる。だからといって借金ばかりにすると、今度は返せなくなる危険が増えます。どの割合で集めるかは、会社にとって悩ましい選択なのです<span class="tag tag-補足">補足</span>。</p>
+
+<h3 id="ch6-6">二つのコストを、どう見積もるか</h3>
+<p>ＷＡＣＣを計算するには、負債コストＲ<sub>Ｄ</sub>と株主資本コストＲ<sub>Ｅ</sub>が必要です。</p>
+<p>負債コストは簡単です。払っている利息を、借りている額で割ればよいのです。</p>
+
+<div class="yoko box calc">
+<p class="box-h">負債コスト(Ｄ:負債総額、Ｉ:負債に対する利息)</p>
+<p class="f">Ｒ<sub>Ｄ</sub> ＝ Ｉ ÷ Ｄ</p>
+<p>例題:負債総額5,000億円、利息150億円 → 150÷5,000 ＝ <b>3.0％</b></p>
+</div>
+
+<p>難しいのは株主資本コストです。株主の期待は、契約書のどこにも書かれていません。そこで、<b>ＣＡＰＭ</b>(キャップエム、資本資産価格モデル)という考え方で推定します。</p>
+
+<div class="yoko box calc">
+<p class="box-h">株主資本コスト(ＣＡＰＭ)</p>
+<p class="f">Ｒ<sub>Ｅ</sub> ＝ Ｒ<sub>Ｆ</sub> ＋ β ×(Ｒ<sub>Ｍ</sub> － Ｒ<sub>Ｆ</sub>)</p>
+<table>
+<tr><td>Ｒ<sub>Ｆ</sub></td><td>リスクフリー・レート(危険のない投資の利回り。長期国債の利回りなど)</td></tr>
+<tr><td>Ｒ<sub>Ｍ</sub></td><td>市場ポートフォリオ(株式市場全体)の利回り</td></tr>
+<tr><td>β</td><td>個別株式の変動 ÷ 株式市場全体の変動</td></tr>
+</table>
+<p>例題:Ｒ<sub>Ｆ</sub> 1.2％(長期国債利回り)、Ｒ<sub>Ｍ</sub> 5.2％、β＝1(市場の動きと完全に連動)→ 1.2％＋1×(5.2％－1.2％)＝ <b>5.2％</b></p>
+</div>
+
+<p>この式は、「危険のない利回り」に「その株の危なさに応じた上乗せ」を足したもの、と読めます。Ｒ<sub>Ｍ</sub>－Ｒ<sub>Ｆ</sub>は、株式市場に投資する人が、国債より余分に求める利回りです。それに、その会社の株がどれだけ激しく動くかを表すβを掛けます。</p>
+<p>三つの材料を、講義の説明で確かめておきましょう<span class="tag tag-講義">講義</span>。リスクフリー・レートは、リスクをまったく負わずに得られる利回りです。日本では長期国債の利回りを使います。国債を買うことは国にお金を貸すことで、日本という国はつぶれないという前提に立てば、そのリターンは確実だからです。市場ポートフォリオの利回りは、特定の株ではなく株式市場全体のリターンで、日経平均やＴＯＰＩＸのようなものをイメージすればよい、とのことでした。そしてβは、その会社の株価が市場全体の動きに対してどう振る舞うか、つまり過剰に反応するのか、あまり反応しないのかを表す数字です。くわしくはファイナンスの授業で学ぶ領域で、この授業では深入りしないと断りがありました。</p>
+
+<figure class="yoko" id="fig15">
+<svg viewBox="0 0 460 230" role="img" aria-label="横軸がベータ、縦軸が株主資本コスト。ベータ0で1.2%、1で5.2%、1.5で7.2%の直線">
+<line x1="50" y1="190" x2="430" y2="190" class="ax"/><line x1="50" y1="190" x2="50" y2="20" class="ax"/>
+<g class="t-s" text-anchor="middle"><text x="50" y="206">0</text><text x="200" y="206">1.0</text><text x="275" y="206">1.5</text><text x="350" y="206">2.0</text><text x="420" y="206">β →</text></g>
+<g class="t-s" text-anchor="end"><text x="45" y="176">1.2%</text><text x="45" y="116">5.2%</text><text x="45" y="86">7.2%</text></g>
+<polyline points="50,172 350,52" class="acc"/>
+<line x1="50" y1="172" x2="430" y2="172" class="dash"/><text x="425" y="166" class="t-s" text-anchor="end">Ｒ<tspan font-size="8" dy="2">Ｆ</tspan><tspan dy="-2">(危険のない利回り)</tspan></text>
+<g fill="var(--accent)"><circle cx="200" cy="112" r="4"/><circle cx="275" cy="82" r="4"/></g>
+<line x1="200" y1="190" x2="200" y2="112" class="dash"/><line x1="50" y1="112" x2="200" y2="112" class="dash"/>
+<line x1="275" y1="190" x2="275" y2="82" class="dash"/><line x1="50" y1="82" x2="275" y2="82" class="dash"/>
+<text x="208" y="108" class="t-s">市場と同じ動き(β＝1)→ 市場全体と同じ5.2%</text>
+<text x="283" y="78" class="t-s">市場の1.5倍動く → 7.2%</text>
+</svg>
+<figcaption>図15　ＣＡＰＭ。βが大きい(値動きが激しい)株ほど、株主が求めるリターン＝株主資本コストは高くなる[新規作図](Ｒ<sub>Ｆ</sub>1.2%、Ｒ<sub>Ｍ</sub>5.2%は第6回スライドの例題の値)</figcaption>
+</figure>
+
+<p>β＝１の株は市場全体と同じように動くので、株主資本コストは市場全体の利回りと同じ五・二％になります。値動きが市場の一・五倍激しい株(β＝一・五)なら、株主はそのぶん多くの上乗せを求め、七・二％になります。危ないものほど、高いリターンを約束しなければお金は集まらない。ＣＡＰＭは、この当たり前の感覚を一本の直線にしたものなのです。</p>
+<p>講義の最後には、負債コスト・株主資本コスト・ＷＡＣＣを続けて求める演習問題も出されていました。株主資本コストは、リスクフリー・レート一・四四％、市場全体の利回り五・九四％、β＝１なので五・九四％、税率四〇％を加味したＷＡＣＣは五・九三％という答えでした<span class="tag tag-講義">講義</span>。ただ、問題文の負債の数値は音声からは正確に聞き取れませんでした<span class="tag tag-要確認">要確認</span>。手順は巻末の練習問題８と同じなので、そちらで確かめてください。</p>
+
+<h3 id="ch6-7">ＥＶＡに戻って</h3>
+<p>道具がそろったので、章の初めのＥＶＡに戻りましょう。税引後営業利益が五十億円、期首投下資本が一千億円、ＷＡＣＣが先ほどの四・四％の会社を考えます。</p>
+
+<div class="yoko box calc">
+<p class="box-h">ＥＶＡの計算</p>
+<table>
+<tr><td>資本コストの額 ＝ 1,000億円 × 4.4％</td><td class="n">44億円</td></tr>
+<tr class="sum"><td>ＥＶＡ ＝ 50億円 － 44億円</td><td class="n">6億円</td></tr>
+</table>
+</div>
+
+<p>ＥＶＡはプラスの六億円。この会社は、お金の値段を払ったうえで、なお六億円の価値を生み出したことになります。もし税引後営業利益が四十億円だったら、決算は立派な黒字なのに、ＥＶＡはマイナス四億円です。お金を出した人たちの期待には届かず、実質的には価値を壊していたことになります。章の初めの問いへの答えは、これです。</p>
+<p>利益が出ているかどうかではなく、お金の値段を超えて稼いでいるかどうか。この見方は、後半の授業で学ぶ企業価値評価の土台になります。</p>
+<p>ところで、ここまで私たちは、決算書の利益を疑わずに使ってきました。営業利益も、当期純利益も、ＲＯＥも、ＥＶＡも、すべて利益から計算しています。けれど、その利益そのものが、経営者の手で動かされていたとしたらどうでしょう。最後の章では、これまで頼ってきたものさしそのものを疑います。</p>
+
+<div class="end">
+<p class="end-h">この章の核心</p>
+<ol>
+<li>会社が使うお金には値段(資本コスト)がある。資本コストは、資本の利用から生じる価値犠牲であり、割引率であり、投資の切捨率である。</li>
+<li>集め方ごとのコスト(利息・配当・留保の機会費用)を構成比で重みづけした平均がＷＡＣＣ。株主資本はリスクマネーなので負債より高くつき、負債には節税効果があるので(１－ｔ)を掛ける。</li>
+<li>負債コスト＝利息÷負債、株主資本コストはＣＡＰＭ(Ｒ<sub>Ｆ</sub>＋β(Ｒ<sub>Ｍ</sub>－Ｒ<sub>Ｆ</sub>))。ＥＶＡ＝税引後営業利益－ＷＡＣＣ×期首投下資本がプラスなら、お金の値段を超えて価値を生んだ。</li>
+</ol>
+<p class="end-h">キーワード</p>
+<p class="kw">経済的付加価値(ＥＶＡ)／税引後営業利益／期首投下資本／資本コスト／価値犠牲／割引率／切捨率／時間的価値／借入／社債／新株の発行／利益の留保／機会損失／リスクマネー／有限責任／加重平均資本コスト(ＷＡＣＣ)／資本構成／負債コスト／株主資本コスト／節税効果／実効税率／ＣＡＰＭ／リスクフリー・レート／市場ポートフォリオ／β</p>
+<p class="end-h">考えてみよう</p>
+<ol>
+<li>株主資本コストが負債コストより高くなるのはなぜか。また、利益の留保(内部留保)にもコストがあると言えるのはなぜか。</li>
+<li>黒字の会社でも経済的付加価値(ＥＶＡ)がマイナスになることがある。その理由を、資本コストの考え方を使って説明しなさい。</li>
+</ol>
+</div>
+</section>
+
+<section class="chapter" id="ch7" data-title="利益はつくれる" data-src="第7回・教科書第13章(＋第1章 分析の留意点、第7章 ＣＦの客観性)">
+<h2 class="ch-title"><span class="ch-no">第七章</span>利益はつくれる</h2>
+
+<p class="lead">ここまで私たちは、決算書の利益をものさしにして会社を測ってきた。けれど、もしそのものさし自体が、測られる側の手で伸び縮みしていたとしたら。決算書の利益は、どこまで信じていいのだろうか。</p>
+
+<h3 id="ch7-1">有用な指標は、操作される</h3>
+<p>学校の成績が、テストの点数だけで決まるとしましょう。すると、生徒は理解を深めることより、点数を取ることそのものに力を注ぐようになります。ヤマを張り、出そうなところだけを覚える。点数は上がっても、本当の実力は点数ほどには伸びていないかもしれません。大事な数字ほど、その数字自体が目的になり、動かされてしまうのです<span class="tag tag-補足">補足</span>。</p>
+<p>会社の利益も同じです。スライドには、たった一行の、しかしこの章の核心となる注意書きがあります。<b>「有用な指標は操作される!」</b></p>
+
+<h3 id="ch7-2">利益の「質」</h3>
+<p>財務諸表分析では、会計利益を中心にさまざまな指標を使います。だから、会計利益の情報価値は、<b>利益の質</b>と結びついています。教科書によれば、会計利益の質の高さは、次の二つで測られます。</p>
+<ol>
+<li>当期の企業業績を<b>的確に反映</b>していること</li>
+<li>将来の企業業績を<b>予測しやすく</b>すること</li>
+</ol>
+<p>第四章で、利益の持続性が二〇〇〇年以降低下している、という研究を見ました。一時的な要因で膨らんだ利益は、来年を予測する手がかりになりません。質の低い利益です。そして、利益の質を下げるもう一つの原因が、経営者による操作です。</p>
+<p>なぜ利益は操作できるのでしょうか。今の会計が<b>発生主義</b>だからです。発生主義では、お金が動いたときではなく、取引が「発生した」ときに収益や費用を計上します。第二章で見たように、掛けで売れば代金が入る前に売上が立ち、機械を買えば何年かに分けて費用にします。</p>
+<p>ここに、<b>経営者の見積もりや判断</b>が入り込みます。この機械を何年使うと見積もるか。売掛金のうち何％が回収できないと見積もるか。売った商品のうち何％が返品されると見積もるか。どれも、将来のことなので正解はありません。だから経営者は、ルールの範囲内で、自分に都合のよい方法を<b>恣意的に選ぶ</b>ことができてしまいます。そうして歪められた会計利益は、会社の実態を表さない<b>ノイズ</b>にすぎず、それを使った財務諸表分析の内容も信頼できなくなります。</p>
+
+<h3 id="ch7-3">なぜ、動かしたくなるのか</h3>
+<p>経営者が利益を動かしたくなる理由は、第一章の「契約の集合体」を思い出すと見えてきます。会計利益は、株主、債権者、納入業者、労働組合、政府といった利害関係者との<b>契約・取引・交渉</b>に使われます。数字が、そのまま誰かの得や損に結びついているのです。</p>
+<p>たとえば、利益が経営者の報酬に影響を与えるなら、経営者には自分に有利になるように会計利益を操作しようとする動機が生まれます。第一章で「経済的帰結」と呼んだものです。このように、経営者が会計利益をコントロールしようとする裁量的な行動を、<b>利益マネジメント</b>(earnings management)、あるいは<b>利益調整</b>、<b>利益数値制御</b>と呼びます。</p>
+<p>ここで、第一章の注意をもう一度思い出してください。利益マネジメントは、会計のルールの範囲内での行動であり、ルールを破る<b>粉飾とは区別</b>されます。違法ではない。だからこそ、どこにでも起こりうるのです。</p>
+
+<h3 id="ch7-4">どうやって動かすのか</h3>
+<p>教科書の図表13-2は、利益マネジメントを二つの軸で整理しています。「何のために」と「どうやって」です。</p>
+<p>まず、何のために。利益マネジメントは、いつも悪だくみとは限りません。</p>
+
+<div class="yoko box">
+<p class="box-h">利益マネジメントのパターン(図表13-2)</p>
+<table>
+<tr><th>パターン</th><th>中身</th></tr>
+<tr><td>Ⅰ　機会主義的選択</td><td>経営者が自分の得のために会計処理を選ぶ(ボーナスを増やすなど)<span class="tag tag-補足">補足</span></td></tr>
+<tr><td>Ⅱ　効率的選択</td><td>利害関係者の犠牲なしに企業価値が高められる(効率的契約)。政府の規制から受ける潜在的なコストを最小にするなど</td></tr>
+<tr><td>Ⅲ　情報提供的選択</td><td>利益マネジメントによって財務諸表の予測能力を向上させるなど、利益の情報価値が増す</td></tr>
+</table>
+</div>
+
+<p>経営者が、来年以降の見通しをより正確に伝えるために見積もりを選ぶなら、それはむしろ投資家の役に立ちます(Ⅲ)。利益マネジメントの全部が、投資家をだますためのものではないのです。</p>
+<p>次に、どうやって。方法は三つに分かれます。</p>
+
+<div class="yoko box">
+<p class="box-h">利益マネジメントの方法(図表13-2)</p>
+<table>
+<tr><th>方法</th><th>例</th><th>期間帰属</th></tr>
+<tr><td>(自主的・強制的)会計的裁量行動</td><td>棚卸資産の評価方法の選択・変更、減価償却方法の選択・変更、貸倒率や返品率の見積もりの選択・変更、耐用年数の見直しなど</td><td>期間相互間</td></tr>
+<tr><td>実体的裁量行動</td><td>期末の出荷延期や押し込み販売、研究開発費や広告宣伝費に対する支出を減らす、有価証券や固定資産の売却時期を選択するなど</td><td>―</td></tr>
+<tr><td>表示区分シフティング</td><td>費用や損失を損益計算書の別の区分に付け替える(本業の費用を特別損失に入れて営業利益をよく見せる、など)<span class="tag tag-補足">補足</span></td><td>同一期間内</td></tr>
+</table>
+</div>
+
+<p>二つの裁量行動の違いが、この章の要です。<b>会計的裁量行動</b>は、取引そのものには手をつけず、<b>帳簿のつけ方</b>(会計方法や見積もり)を変えます。機械の耐用年数を五年から八年に見直せば、毎年の減価償却費が減り、利益が増えます。取引は何も変わっていません。</p>
+<p><b>実体的裁量行動</b>は、<b>実際の活動そのもの</b>を変えます。期末に取引先へ商品を大量に送りつけて売上を立てる(押し込み販売)、広告や研究開発の支出を絞る、含み益のある土地や株を売る時期を選ぶ。こちらは本当にお金の使い方が変わるので、利益は見かけでなく実際に動きます。けれど、広告をやめれば来年の売上が落ちるかもしれず、研究開発をやめれば将来の競争力を失うかもしれません。実体的裁量行動は、会社の将来を削って今年の数字を整える行動でもあるのです<span class="tag tag-補足">補足</span>。</p>
+<p>表の右端の<b>期間帰属</b>は、利益がどこからどこへ動くかを表しています。会計的裁量行動は、今年の利益を増やせば、その分だけ将来の利益が減ります。減価償却費を先送りしても、機械の値段が消えるわけではないからです。利益は年度の間を行き来するだけ(<b>期間相互間</b>)です。表示区分シフティングは、最終的な利益は変えずに、同じ年度の中で利益の種類を付け替えるだけ(<b>同一期間内</b>)です。</p>
+
+<h3 id="ch7-5">上げるか、下げるか、ならすか</h3>
+<p>利益を動かす向きにも、三つの型があります。</p>
+<ul>
+<li><b>利益捻出(増加)型</b>(income-increasing):利益を増やす</li>
+<li><b>利益圧縮(減少)型</b>(income-decreasing):利益を減らす</li>
+<li><b>利益平準化</b>(income smoothing):年ごとの利益の凸凹をならす</li>
+</ul>
+<p>利益を減らしたがる経営者がいる、というのは意外かもしれません。その理由がいちばんよくわかるのが、経営者の報酬契約にある<b>ボーナス・プラン</b>です。</p>
+
+<figure class="yoko" id="fig16">
+<svg viewBox="0 0 460 240" role="img" aria-label="標準的なボーナス・プラン。利益が下限未満ならボーナスはゼロ、下限から上限までは利益に比例、上限を超えると一定">
+<line x1="50" y1="200" x2="440" y2="200" class="ax"/><line x1="50" y1="200" x2="50" y2="20" class="ax"/>
+<text x="436" y="218" class="t-s" text-anchor="end">利益指標 →</text><text x="56" y="22" class="t-s">ボーナス額</text>
+<line x1="150" y1="200" x2="150" y2="40" class="dash"/><line x1="320" y1="200" x2="320" y2="40" class="dash"/>
+<line x1="50" y1="150" x2="150" y2="150" class="dash"/><line x1="50" y1="70" x2="320" y2="70" class="dash"/>
+<text x="46" y="154" class="t-s" text-anchor="end">下限</text><text x="46" y="74" class="t-s" text-anchor="end">上限</text>
+<text x="150" y="216" class="t-s" text-anchor="middle">目標利益</text>
+<polyline points="50,199 150,199" class="acc"/>
+<polyline points="150,150 320,70 430,70" class="acc"/>
+<circle cx="150" cy="150" r="4" fill="var(--accent)"/><text x="160" y="166" class="t-s">Ａ</text>
+<circle cx="320" cy="70" r="4" fill="var(--accent)"/><text x="324" y="62" class="t-s">Ｃ</text>
+<text x="240" y="125" class="t-s" text-anchor="middle">報酬利益関係</text>
+<line x1="150" y1="34" x2="320" y2="34" class="ln"/><text x="235" y="30" class="t-s" text-anchor="middle">Ｂ</text>
+<text x="100" y="190" class="t-s" text-anchor="middle">ゼロ</text>
+<text x="380" y="62" class="t-s" text-anchor="middle">頭打ち</text>
+</svg>
+<figcaption>図16　標準的なボーナス・プラン(第7回スライド、教科書 図表13-3。Murphy(2000)を基礎に作成)</figcaption>
+</figure>
+
+<p>利益が<b>目標利益</b>(Ａ)に届かなければ、ボーナスはゼロです。目標を超えると、ボーナスは下限の額から始まり、利益に比例して増えていきます。そして利益がある水準(Ｃ)を超えると、ボーナスは上限で頭打ちになります。</p>
+<p>この契約のもとで、あなたが経営者ならどうするでしょうか。</p>
+
+<div class="yoko box">
+<p class="box-h">ボーナス・プランと利益マネジメントの戦略</p>
+<table>
+<tr><th>今年の利益の見込み</th><th>とる行動</th><th>理由</th></tr>
+<tr><td>下限の少し下 〜 上限の少し下</td><td>利益捻出型</td><td>利益を少し増やせば、ボーナスがもらえる(増える)</td></tr>
+<tr><td>上限よりも上</td><td>利益圧縮型</td><td>これ以上増やしてもボーナスは増えない。余った利益は来年に回したほうが得</td></tr>
+<tr><td>下限よりもかなり下</td><td>利益圧縮型(ビッグバス)</td><td>どうせ今年はゼロ。損失や費用を今年にまとめて出し、来年の利益を出しやすくする</td></tr>
+</table>
+<p class="cap">上の二つは、利益をボーナスが増える範囲に収めようとする動きなので、利益平準化ともいえる</p>
+</div>
+
+<p>三つめの<b>ビッグバス</b>(big bath)は、「大きなお風呂」で汚れを一度に洗い流すように、悪い年に膿をまとめて出し切る行動です。今年がどうせ大赤字なら、少し赤字が増えても同じこと。将来出るはずだった損失まで今年にまとめて計上しておけば、来年以降は利益が出やすくなり、ボーナスも取り戻しやすくなります。</p>
+
+<h3 id="ch7-6">動機がわかれば、向きがわかる</h3>
+<p>ボーナス以外にも、利益を動かす動機はたくさんあります。教科書の図表13-4は、動機と、そのときに使われる行使パターンを対応させています。</p>
+
+<div class="yoko box">
+<p class="box-h">利益マネジメントの動機とその行使パターン(図表13-4)</p>
+<table>
+<tr><th>動機</th><th>行使パターン</th></tr>
+<tr><td>負債契約の財務制限条項</td><td>利益捻出型</td></tr>
+<tr><td>損失・減益の回避</td><td>利益捻出型</td></tr>
+<tr><td>予想利益の達成</td><td>利益捻出型</td></tr>
+<tr><td>新規株式公開</td><td>利益捻出型</td></tr>
+<tr><td>株式交換による企業買収</td><td>利益捻出型</td></tr>
+<tr><td>マネジメント・バイアウト</td><td>利益圧縮型</td></tr>
+<tr><td>労働組合との交渉</td><td>利益圧縮型</td></tr>
+<tr><td>税務コストの削減</td><td>利益圧縮型</td></tr>
+<tr><td>政治的コストの縮減</td><td>利益圧縮型</td></tr>
+<tr><td>経営者交代</td><td>ビッグバス</td></tr>
+<tr><td>利益のボラティリティーの抑制</td><td>利益平準化</td></tr>
+</table>
+</div>
+
+<p>この表は丸暗記しなくても、筋道で思い出せます<span class="tag tag-補足">補足</span>。<b>だれかに高く評価してほしいときは捻出、安く見てほしいときは圧縮</b>です。銀行との借入契約に「利益が一定以下なら条件を厳しくする」という条項(財務制限条項)があれば、利益を上げたい。株を初めて売り出す(新規株式公開)なら、高い値段をつけてほしい。自社の株を渡して相手を買収するなら、自社の株価を高く保ちたい。どれも捻出です。</p>
+<p>逆に、経営陣が自分の会社を買い取る(マネジメント・バイアウト)なら、安く買いたいので利益を小さく見せたい。労働組合との賃金交渉では「そんなにもうかっていない」と言いたい。税金や、もうけすぎだという世間や規制当局の批判(政治的コスト)も、利益が小さいほうが避けられます。どれも圧縮です。</p>
+<p>そして経営者が交代した年には、ビッグバスが起こりやすくなります。新しい経営者は、悪い数字を「前の経営者の時代の後始末」として一度に出し切り、自分の任期の業績を良く見せることができるからです。</p>
+
+<h3 id="ch7-7">利益とお金の差に、裁量は隠れる</h3>
+<p>では、外から利益マネジメントを見つけるには、どうすればよいのでしょうか。ここで、第二章の「利益は意見、お金は事実」が生きてきます。</p>
+<p>発生主義のもとでは、利益とお金は一致しません。税引後利益は、営業ＣＦに、発生主義の会計手続きによる部分を付け加えたものと考えられます。この付け加えられた部分を<b>会計発生高</b>(accruals)と呼びます。</p>
+
+<figure class="yoko" id="fig18">
+<svg viewBox="0 0 460 200" role="img" aria-label="税引後利益は営業CFと総会計発生高の和。総会計発生高は非裁量的会計発生高と裁量的会計発生高の和">
+<rect x="20" y="20" width="420" height="40" class="f-a"/><text x="230" y="45" class="t-h" text-anchor="middle">税引後利益(Ｘ)</text>
+<rect x="20" y="78" width="250" height="40" class="f-box"/><text x="145" y="103" class="t-h" text-anchor="middle">営業ＣＦ(ＣＦ)＝事実</text>
+<rect x="270" y="78" width="170" height="40" class="f-c"/><text x="355" y="103" class="t-h" text-anchor="middle">総会計発生高(ＴＡ)</text>
+<rect x="270" y="136" width="100" height="40" class="f-c"/><text x="320" y="152" class="t-s" text-anchor="middle">非裁量的</text><text x="320" y="167" class="t-s" text-anchor="middle">(ＮＤＡ)</text>
+<rect x="370" y="136" width="70" height="40" class="f-b"/><text x="405" y="152" class="t-s" text-anchor="middle">裁量的</text><text x="405" y="167" class="t-s" text-anchor="middle">(ＤＡ)</text>
+<text x="230" y="194" class="t-s" text-anchor="middle">Ｘ ＝ ＣＦ ＋ ＴＡ (13.1)　　ＴＡ ＝ ＮＤＡ ＋ ＤＡ (13.2)</text>
+</svg>
+<figcaption>図18　会計発生高の分解。経営者の裁量は、利益と営業ＣＦの差の中の、さらに一部(ＤＡ)に隠れている[新規作図](式は第7回スライド、教科書 式13.1・13.2)</figcaption>
+</figure>
+
+<p>会計方法の選択や変更、見越し・繰延べ項目の見積もり、判断は、経営者の裁量に委ねられています。その裁量は、<b>会計利益と営業ＣＦの差</b>、つまり会計発生高の中に隠れている可能性があります。お金の動きはごまかしにくいので、利益だけが不自然に大きく、お金がついてきていない会社は、どこかで見積もりを都合よく動かしているかもしれないのです。</p>
+<p>ただし、会計発生高のすべてが操作ではありません。売上が伸びれば売掛金も自然に増えます。そこで、総会計発生高を、事業の実態から自然に生じる<b>非裁量的会計発生高</b>(ＮＤＡ)と、経営者の裁量的行動による<b>裁量的会計発生高</b>(ＤＡ)に分けます。利益マネジメントの大きさは、ＤＡのほうです。</p>
+<p>たとえば、当期純利益が三百、営業ＣＦが二百二十なら、総会計発生高は八十です。そのうち、会社の規模や売上の伸びから考えて自然に生じるはずの部分が五十なら、残りの三十が裁量的会計発生高、つまり経営者が利益を押し上げた疑いのある部分になります。</p>
+<p>とはいえ、スライドにも「Question!」と書かれているとおり、問題は<b>裁量的会計発生高をどのように測定するのか</b>です。外からはＮＤＡとＤＡの境目が見えません。研究では、会社の規模や売上の変化などから「本来これくらいになるはずの会計発生高(ＮＤＡ)」を統計的に推定し、実際の総会計発生高との差をＤＡとみなす方法がとられています<span class="tag tag-補足">補足</span>。</p>
+
+<h3 id="ch7-8">ゼロのすぐ上に、会社が多すぎる</h3>
+<p>もう一つ、利益マネジメントの存在を鮮やかに示す方法があります。<b>利益の分布テスト</b>です。</p>
+<p>たくさんの会社の利益を、総資産に対する大きさで並べて、ヒストグラムにします。利益が自然にばらつくなら、ゼロの前後でなめらかな山になるはずです。ところが実際には、次のような形になります。</p>
+
+<figure class="yoko" id="fig17">
+<svg viewBox="0 0 460 210" role="img" aria-label="当期純利益の分布。ゼロのすぐ左が急に少なく、すぐ右が急に多い">
+<line x1="30" y1="175" x2="440" y2="175" class="ax"/>
+<line x1="235" y1="20" x2="235" y2="175" class="dash"/>
+<g class="f-box" stroke-width="0.5">
+<rect x="60" y="169" width="12" height="6"/><rect x="74" y="167" width="12" height="8"/><rect x="88" y="164" width="12" height="11"/><rect x="102" y="160" width="12" height="15"/><rect x="116" y="155" width="12" height="20"/><rect x="130" y="149" width="12" height="26"/><rect x="144" y="141" width="12" height="34"/><rect x="158" y="131" width="12" height="44"/><rect x="172" y="120" width="12" height="55"/><rect x="186" y="108" width="12" height="67"/><rect x="200" y="96" width="12" height="79"/>
+</g>
+<rect x="214" y="128" width="12" height="47" class="f-b"/>
+<rect x="237" y="28" width="12" height="147" class="f-a"/>
+<g class="f-box" stroke-width="0.5">
+<rect x="251" y="40" width="12" height="135"/><rect x="265" y="56" width="12" height="119"/><rect x="279" y="74" width="12" height="101"/><rect x="293" y="92" width="12" height="83"/><rect x="307" y="109" width="12" height="66"/><rect x="321" y="124" width="12" height="51"/><rect x="335" y="137" width="12" height="38"/><rect x="349" y="148" width="12" height="27"/><rect x="363" y="157" width="12" height="18"/><rect x="377" y="164" width="12" height="11"/><rect x="391" y="169" width="12" height="6"/>
+</g>
+<text x="235" y="192" class="t-s" text-anchor="middle">0</text>
+<text x="60" y="192" class="t-s">← 赤字</text><text x="430" y="192" class="t-s" text-anchor="end">黒字 →</text>
+<text x="208" y="124" class="t-s" text-anchor="end">急に少ない</text>
+<text x="252" y="24" class="t-s">急に多い</text>
+</svg>
+<figcaption>図17　当期純利益の分布(第7回スライド、教科書 Appendix 13-4 の図App13-2の形の模式。元の図は期首総資産に対する当期純利益の比率、約2万企業・年)</figcaption>
+</figure>
+
+<p><b>ゼロのすぐ下(わずかな赤字)の会社が極端に少なく、ゼロのすぐ上(わずかな黒字)の会社が極端に多い</b>のです。自然のばらつきでは、こんな崖のような段差はできません。考えられる説明は一つ。わずかな赤字になりそうだった会社の多くが、利益をほんの少し捻出して、ぎりぎりの黒字に滑り込ませているのです。図表13-4の「損失・減益の回避」が、何万という会社のデータの形にくっきりと表れているわけです。第一章で触れた、経験則を仮説にして大量のデータで確かめる実証会計研究の、典型的な成果です。</p>
+
+<!--CH7-LECTURE-->
+
+<h3 id="ch7-9">疑う目を持って読む</h3>
+<p>この章で見てきたことは、決算書を信じるなという話ではありません。利益マネジメントの多くはルールの範囲内であり、中には投資家に役立つものもあります。大切なのは、利益という数字が「経営者の判断を含んだ意見」であることを知ったうえで読むことです。</p>
+<p>利益が大きく伸びたら、営業ＣＦもついてきているかを確かめる。ぎりぎりの黒字や、予想をぴったり達成した決算を見たら、少し立ち止まる。経営者が交代した年の大きな損失は、前任者の後始末なのか、未来のための準備なのかを考える。それができれば、あなたはもう、数字に書かれたことだけでなく、書かれ方まで読めるようになっています。</p>
+
+<div class="end">
+<p class="end-h">この章の核心</p>
+<ol>
+<li>利益の質は、当期の業績を的確に反映し、将来を予測しやすくするかで測る。発生主義では経営者の見積もり・判断が入るため、利益は操作できる(有用な指標は操作される)。</li>
+<li>利益マネジメントには目的(機会主義的・効率的・情報提供的)、方法(会計的裁量行動・実体的裁量行動・表示区分シフティング)、向き(捻出・圧縮・平準化)がある。ボーナス・プランでは、位置によって捻出・圧縮・ビッグバスを使い分ける。</li>
+<li>税引後利益＝営業ＣＦ＋総会計発生高、総会計発生高＝非裁量的＋裁量的。裁量は利益とお金の差に隠れ、利益の分布はゼロの直後に集中する。</li>
+</ol>
+<p class="end-h">キーワード</p>
+<p class="kw">会計利益の質／発生主義会計／見積もり／恣意性／ノイズ／利益マネジメント／利益調整／利益数値制御／粉飾／機会主義的選択／効率的選択(効率的契約)／情報提供的選択／会計的裁量行動／実体的裁量行動／押し込み販売／表示区分シフティング／期間相互間／同一期間内／利益捻出型／利益圧縮型／利益平準化／ボーナス・プラン／目標利益／ビッグバス／財務制限条項／新規株式公開／マネジメント・バイアウト／政治的コスト／経営者交代／会計発生高／総会計発生高／裁量的会計発生高／非裁量的会計発生高／利益の分布テスト</p>
+<p class="end-h">考えてみよう</p>
+<ol>
+<li>会計的裁量行動と実体的裁量行動の違いを、それぞれ具体例をあげて説明しなさい。</li>
+<li>標準的なボーナス・プランのもとで、経営者の利益マネジメントの戦略が利益の水準によってどう変わるかを説明しなさい。</li>
+</ol>
+</div>
+</section>
+
+<section class="chapter" id="epilogue" data-title="三つのものさし" data-src="全章のまとめ">
+<h2 class="ch-title"><span class="ch-no">終章</span>三つのものさし</h2>
+
+<p class="lead">ここまで、ずいぶん多くの指標と出会ってきた。では結局、会社の何を見ればいいのか。最後に、旅の地図をもう一度広げてみよう。</p>
+
+<h3 id="ep-1">一枚の地図にする</h3>
+<p>序章で、この本には三本のものさししか出てこないと書きました。利益、お金、価値です。七つの章で出会った概念を、このものさしの上に並べ直すと、次のようになります。</p>
+
+<figure class="yoko" id="fig19">
+<svg viewBox="0 0 460 330" role="img" aria-label="全章の概念関係マップ。利益、お金、価値の三つのものさしと、各章の概念のつながり">
+<defs><marker id="arE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--ink-soft)"/></marker></defs>
+<rect x="160" y="8" width="140" height="34" class="f-box"/><text x="230" y="22" class="t-s" text-anchor="middle">第一章 だれが読むか</text><text x="230" y="36" class="t-s" text-anchor="middle">意思決定支援・利害調整</text>
+<rect x="10" y="70" width="135" height="40" class="f-c"/><text x="77" y="94" class="t-h" text-anchor="middle">利益(意見)</text>
+<rect x="162" y="70" width="135" height="40" class="f-a"/><text x="229" y="94" class="t-h" text-anchor="middle">お金(事実)</text>
+<rect x="314" y="70" width="135" height="40" class="f-b"/><text x="381" y="94" class="t-h" text-anchor="middle">価値</text>
+<g class="t-s" text-anchor="middle">
+<text x="77" y="132">第四章 成長性</text><text x="77" y="148">前期比・趨勢比</text><text x="77" y="164">年平均成長率</text><text x="77" y="180">サステイナブル成長率</text><text x="77" y="196">平均回帰</text>
+<text x="229" y="132">第二章 ズレ・三区分</text><text x="229" y="148">間接法・経営パターン</text><text x="229" y="168">第三章 ＣＦ指標</text><text x="229" y="184">フリー・キャッシュ・フロー</text>
+<text x="381" y="132">第五章 付加価値</text><text x="381" y="148">労働生産性・労働分配率</text><text x="381" y="168">第六章 資本コスト</text><text x="381" y="184">ＷＡＣＣ・ＣＡＰＭ・ＥＶＡ</text>
+</g>
+<line x1="145" y1="90" x2="160" y2="90" class="ln" marker-end="url(#arE)"/>
+<text x="152" y="62" class="t-s" text-anchor="middle">ズレ</text>
+<line x1="297" y1="90" x2="312" y2="90" class="ln" marker-end="url(#arE)"/>
+<rect x="60" y="222" width="340" height="44" class="f-box"/><text x="230" y="240" class="t-h" text-anchor="middle">第七章 利益マネジメント</text><text x="230" y="257" class="t-s" text-anchor="middle">利益 ＝ 営業ＣＦ ＋ 会計発生高(裁量はここに隠れる)</text>
+<line x1="77" y1="200" x2="150" y2="222" class="ln" marker-end="url(#arE)"/><line x1="229" y1="190" x2="229" y2="222" class="ln" marker-end="url(#arE)"/>
+<text x="230" y="292" class="t-s" text-anchor="middle">どの章でも:何と比べるか(時系列・他社・計画・予想・資本コスト)</text>
+<text x="230" y="312" class="t-s" text-anchor="middle">「有用な指標は操作される」</text>
+</svg>
+<figcaption>図19　全章の概念関係マップ[新規作図]</figcaption>
+</figure>
+
+<p>第一章は、すべての土台でした。財務諸表は、会社と利害関係者が結んだ約束を確かめるための言葉であり、約束の前には意思決定を助け、約束のあとには利害を調整します。だからこそ、数字は読む人の立場によって違う物語を語ります。</p>
+<p>第二章と第三章では、利益とお金のズレに分け入りました。掛けで売れば利益が先に立ち、機械を買えばお金が先に出ていく。全期間では一致するズレも、途中の一年一年では会社の生死を分けます。間接法は利益からお金を逆算する道具であり、フリー・キャッシュ・フローは、会社の持ち主の目から見た本当の稼ぎでした。</p>
+<p>第四章では、時間の軸を伸ばしました。伸びは掛け算で積み重なるので、平均は幾何平均で取る。そして、どんなに高い成長率も、どんなに低い成長率も、やがて平均に回帰していく。</p>
+<p>第五章と第六章では、価値を測りました。売上の大きさではなく、会社が自分の手で生み出した付加価値を見る。そしてお金には値段があり、その値段を超えて稼いではじめて、本当に価値を生んだと言える。</p>
+<p>そして第七章で、それまで頼ってきた利益そのものを疑いました。利益は経営者の判断を含んだ意見であり、その裁量は、利益とお金の差に隠れている。第二章で学んだお金という事実が、ここで利益を確かめる物差しとして戻ってきたのです。</p>
+
+<h3 id="ep-2">すべての章に共通していたこと</h3>
+<p>七つの章を通して、同じ問いが何度も顔を出していました。<b>何と比べるのか</b>です。</p>
+<p>前期比は去年と比べ、クロスセクション分析はライバルと比べ、経営者予想は自分の約束と比べ、労働分配率は同業他社と比べ、ＥＶＡは資本コストと比べました。趨勢比は、比べる基準の年を変えるだけで見え方ががらりと変わりました。経営分析とは、つまるところ、<b>適切な比較の相手を選ぶ技術</b>なのかもしれません。</p>
+<p>もう一つ、繰り返し出てきたのが、<b>数字の向こうにいる人</b>です。黒字倒産におびえる経営者、高い配当を求める株主、賃上げを求める従業員、ボーナスのために利益を調整したくなる経営者、ぎりぎりの黒字に滑り込む何千もの会社。財務諸表は乾いた数字の表に見えて、その実、人の判断と思惑がぎっしり詰まった記録です。それを読み解くことが、経営分析という学問の面白さなのだと思います。</p>
+
+<p>この二つは、試験で説明を求められたときの道しるべにもなります。記述の問いの多くは、「なぜそうなるのか」と「だからどうなるのか」をセットで問うものです。利益とお金がずれるのは、信用取引と設備投資のせい(原因)で、だから黒字でも資金繰りに困る(結果)。株主のお金が高くつくのは、株主がリスクを背負っているから(原因)で、だからＷＡＣＣでは株主資本の比率が高いほどコストが上がる(結果)。経営者が利益を動かすのは、利益が契約や報酬に結びついているから(原因)で、だから利益はゼロのすぐ上に集まる(結果)。用語を覚えるだけでなく、原因と結果を一本の線でつなげて書けるかどうかが、点数を分けます。</p>
+
+<h3 id="ep-3">試験の前に、もう一度</h3>
+<p>中間テストの前日には、次の順番で見直すことをすすめます。</p>
+<ol>
+<li>各章の終わりにある「この章の核心」を、声に出して説明する。</li>
+<li>巻末の公式の一覧を、分母を手で隠して言えるか確かめる。</li>
+<li>巻末の練習問題を、途中の式を書きながら電卓で解く。とくに間接法(問１)、年平均成長率(問４)、ＷＡＣＣとＣＡＰＭ(問７・問８)。</li>
+<li>巻末の「注意して読む箇所の一覧」で、［要確認］の印がついたところを見ておく。</li>
+</ol>
+<p>そして、試験が終わったあとも、この本で身につけた目は残ります。気になる会社の決算書を開いてみてください。利益とお金はついてきているか。伸びはどれくらい続きそうか。お金の値段を超えて稼いでいるか。数字の書かれ方に、何か意図は見えないか。そう問いかけながら読めば、決算書はもう、ただの数字の表ではなくなっているはずです。</p>
+</section>
+
+<section class="chapter" id="appendix" data-title="巻末 ― 試験の前に" data-src="公式・計算の練習・キーワード・想定問題">
+<h2 class="ch-title"><span class="ch-no">巻末</span>試験の前に</h2>
+
+<p class="lead">ここからは、読み物ではなく道具です。中間テストは持ち込み不可、電卓だけが味方です。公式は分母を手で隠して言えるか、計算は手順を書きながら解けるかを確かめてください。</p>
+
+<h3 id="ap-1">公式の一覧</h3>
+<p>本文で出てきた公式を、章の順に並べました。いちばん多い間違いは、分母と分子の取り違えです。</p>
+
+<div class="yoko box">
+<p class="box-h">キャッシュ・フロー(第二章・第三章)</p>
+<table>
+<tr><th>指標</th><th>式</th></tr>
+<tr><td>営業ＣＦマージン</td><td>営業ＣＦ ÷ 売上高 ×100</td></tr>
+<tr><td>自己資本営業ＣＦ比率</td><td>営業ＣＦ ÷ 自己資本 ×100</td></tr>
+<tr><td>営業ＣＦ対流動負債比率</td><td>営業ＣＦ ÷ 流動負債 ×100</td></tr>
+<tr><td>債務償還年数</td><td>有利子負債 ÷ 営業ＣＦ(年)</td></tr>
+<tr><td>営業ＣＦ対利払率</td><td>営業ＣＦ ÷ 支払利息(倍)</td></tr>
+<tr><td>設備投資比率</td><td>営業ＣＦ ÷ 設備投資額 ×100</td></tr>
+<tr><td>投資ＣＦ対営業ＣＦ比率</td><td>投資ＣＦ ÷ 営業ＣＦ ×100</td></tr>
+<tr><td>ＦＣＦ</td><td>営業ＣＦ ＋ 投資ＣＦ<br>営業ＣＦの小計 － 法人税等の支払額 － 正味設備投資</td></tr>
+<tr><td>ＦＣＦ(間便法)</td><td>ＥＢＩＴ ×(１－τ)＋ ＤＰ －(ＣＡＰＥＸ ＋ ΔＷＣ)</td></tr>
+</table>
+<p class="cap">間接法の符号:減価償却費・減損損失・引当金の増加は＋/受取利息配当は－、支払利息は＋(小計の下で実際の受払いを入れ直す)/売上債権・棚卸資産の増加は－/仕入債務の増加は＋/法人税等の支払額は小計の下で－</p>
+</div>
+
+<div class="yoko box">
+<p class="box-h">成長性(第四章)</p>
+<table>
+<tr><th>指標</th><th>式</th></tr>
+<tr><td>前期比</td><td>(当期実績値 － 前期実績値)÷ 前期実績値 ×100</td></tr>
+<tr><td>趨勢比</td><td>(当期実績値 － ベース年度実績値)÷ ベース年度実績値 ×100</td></tr>
+<tr><td>年平均成長率</td><td>(<sup>年数</sup>√(当期実績値 ÷ ベース年度実績値)－ 1)×100</td></tr>
+<tr><td>サステイナブル成長率</td><td>(当期純利益 － 配当)÷ 期首自己資本 ＝ ＲＯＥ ×(１－配当性向)</td></tr>
+</table>
+</div>
+
+<div class="yoko box">
+<p class="box-h">付加価値・資本コスト(第五章・第六章)</p>
+<table>
+<tr><th>指標</th><th>式</th></tr>
+<tr><td>付加価値(控除法)</td><td>売上高 － 外部から受け入れた購入額</td></tr>
+<tr><td>付加価値(加算法)</td><td>人件費 ＋ 賃借料 ＋ 金融費用 ＋ 減価償却費 ＋ 税金 ＋ 税引後利益</td></tr>
+<tr><td>労働生産性</td><td>付加価値 ÷ 従業員数 ＝ 付加価値率 × 従業員一人当たり売上高</td></tr>
+<tr><td>労働分配率</td><td>人件費 ÷ 付加価値 ×100 ＝ 一人当たり人件費 ÷ 労働生産性</td></tr>
+<tr><td>経済的付加価値(ＥＶＡ)</td><td>税引後営業利益 － 加重平均資本コスト(％)× 期首投下資本</td></tr>
+<tr><td>加重平均資本コスト</td><td>Ｄ/(Ｄ＋Ｅ)×(１－ｔ)×Ｒ<sub>Ｄ</sub> ＋ Ｅ/(Ｄ＋Ｅ)×Ｒ<sub>Ｅ</sub></td></tr>
+<tr><td>負債コスト</td><td>Ｒ<sub>Ｄ</sub> ＝ Ｉ ÷ Ｄ</td></tr>
+<tr><td>株主資本コスト(ＣＡＰＭ)</td><td>Ｒ<sub>Ｅ</sub> ＝ Ｒ<sub>Ｆ</sub> ＋ β ×(Ｒ<sub>Ｍ</sub> － Ｒ<sub>Ｆ</sub>)</td></tr>
+</table>
+</div>
+
+<div class="yoko box">
+<p class="box-h">利益マネジメント(第七章)</p>
+<table>
+<tr><td>総会計発生高</td><td>税引後利益(Ｘ)＝ 営業ＣＦ ＋ 総会計発生高(ＴＡ)</td></tr>
+<tr><td>会計発生高の分解</td><td>ＴＡ ＝ 非裁量的会計発生高(ＮＤＡ)＋ 裁量的会計発生高(ＤＡ)</td></tr>
+</table>
+</div>
+
+<h3 id="ap-2">計算の手順と練習</h3>
+<p>本番と同じように、途中の式を書きながら解いてください。答えは問題の下を押すと開きます。ふつうの電卓で「何乗根」を出すには、二乗根なら√を一回、四乗根なら二回押します。三年や五年のときは、答えの候補を何回か掛けて確かめるのが確実です(多くの電卓は「1.15×＝＝＝＝」で同じ数を繰り返し掛けられます)。</p>
+
+<div class="yoko box calc"><p class="box-h">問１　間接法(第二章)</p>
+<p>次の資料から営業ＣＦを求めなさい。受取利息と支払利息は営業ＣＦの部に記載する。<br>税金等調整前当期純利益 500/減価償却費 120/貸倒引当金の増加額 10/受取利息 15/支払利息 25/売上債権の増加額 40/棚卸資産の減少額 20/仕入債務の減少額 30/利息の受取額 15/利息の支払額 25/法人税等の支払額 150</p>
+<details class="ans"><summary>答えと手順</summary><p>小計 ＝ 500＋120＋10－15＋25－40＋20－30 ＝ 590<br>営業ＣＦ ＝ 590＋15－25－150 ＝ <b>430</b><br>仕入債務の「減少」は支払いを済ませたのでマイナス。</p></details></div>
+
+<div class="yoko box calc"><p class="box-h">問２　ＦＣＦと債務償還年数(第三章)</p>
+<p>問１の会社の投資ＣＦが －300、有利子負債が 1,720 のとき、(1)ＦＣＦ(営業ＣＦ＋投資ＣＦ)、(2)債務償還年数を求めなさい。</p>
+<details class="ans"><summary>答えと手順</summary><p>(1)430－300 ＝ <b>130</b>(営業ＣＦ＞|投資ＣＦ|なので対角線の右側)<br>(2)1,720 ÷ 430 ＝ <b>4年</b></p></details></div>
+
+<div class="yoko box calc"><p class="box-h">問３　間便法(第三章)</p>
+<p>ＥＢＩＴ 200、税率 30％、減価償却費 50、正味設備投資額 90、増加運転資本 20 のとき、ＦＣＦを求めなさい。</p>
+<details class="ans"><summary>答えと手順</summary><p>ＮＯＰＬＡＴ ＝ 200×(1－0.3)＝ 140<br>ＦＣＦ ＝ 140＋50－(90＋20)＝ <b>80</b></p></details></div>
+
+<div class="yoko box calc"><p class="box-h">問４　成長率(第四章)</p>
+<p>4期前の売上高 625、当期の売上高 1,000。(1)趨勢比、(2)年平均成長率を求めなさい。</p>
+<details class="ans"><summary>答えと手順</summary><p>(1)(1,000－625)÷625×100 ＝ <b>60％</b><br>(2)1,000÷625 ＝ 1.6 → √ → 1.2649 → √ → 1.1247 → <b>約12.5％</b><br>「60％÷4年＝15％」は誤り(複利で積み重なるため)。</p></details></div>
+
+<div class="yoko box calc"><p class="box-h">問５　サステイナブル成長率(第四章)</p>
+<p>ＲＯＥ 12％、配当性向 25％ の会社のサステイナブル成長率を求めなさい。</p>
+<details class="ans"><summary>答えと手順</summary><p>12％×(1－0.25)＝ <b>9％</b></p></details></div>
+
+<div class="yoko box calc"><p class="box-h">問６　労働生産性と労働分配率(第五章)</p>
+<p>売上高 8,000、付加価値 2,000、人件費 1,300、従業員数 40人。(1)労働生産性、(2)付加価値率、(3)従業員一人当たり売上高、(4)労働分配率、(5)一人当たり人件費を求め、分解式で確かめなさい。</p>
+<details class="ans"><summary>答えと手順</summary><p>(1)2,000÷40 ＝ <b>50</b>(2)2,000÷8,000 ＝ <b>25％</b>(3)8,000÷40 ＝ <b>200</b> → 0.25×200 ＝ 50 で(1)と一致<br>(4)1,300÷2,000×100 ＝ <b>65％</b>(5)1,300÷40 ＝ <b>32.5</b> → 32.5÷50 ＝ 0.65 で(4)と一致</p></details></div>
+
+<div class="yoko box calc"><p class="box-h">問７　加重平均資本コストの表(第六章)</p>
+<p>借入金 100億円(4％)、社債 60億円(5％)、資本金 30億円(9％)、内部留保 10億円(10％)。平均資本コストを求めなさい。</p>
+<details class="ans"><summary>答えと手順</summary><p>合計 200億円。構成比は 50％・30％・15％・5％。<br>0.5×4 ＝ 2.0、0.3×5 ＝ 1.5、0.15×9 ＝ 1.35、0.05×10 ＝ 0.5 → 合計 <b>5.35％</b></p></details></div>
+
+<div class="yoko box calc"><p class="box-h">問８　負債コスト・ＣＡＰＭ・ＷＡＣＣ・ＥＶＡ(第六章)</p>
+<p>負債 600億円(利息 18億円)、株主資本 400億円、リスクフリー・レート 1％、市場全体の利回り 6％、β 1.2、税率 30％。税引後営業利益 50億円、期首投下資本 1,000億円。(1)負債コスト、(2)株主資本コスト、(3)ＷＡＣＣ、(4)ＥＶＡを求めなさい。</p>
+<details class="ans"><summary>答えと手順</summary><p>(1)18÷600 ＝ <b>3％</b><br>(2)1％＋1.2×(6％－1％)＝ <b>7％</b><br>(3)0.6×(1－0.3)×3％ ＋ 0.4×7％ ＝ 1.26％＋2.8％ ＝ <b>4.06％</b><br>(4)50 － 1,000×4.06％ ＝ 50－40.6 ＝ <b>9.4億円</b></p></details></div>
+
+<div class="yoko box calc"><p class="box-h">問９　会計発生高(第七章)</p>
+<p>当期純利益 300、営業ＣＦ 220、非裁量的会計発生高 50 のとき、総会計発生高と裁量的会計発生高を求めなさい。</p>
+<details class="ans"><summary>答えと手順</summary><p>ＴＡ ＝ 300－220 ＝ <b>80</b>、ＤＡ ＝ 80－50 ＝ <b>30</b></p></details></div>
+
+<h3 id="ap-3">章別キーワード一覧</h3>
+<p>用語だけを並べました。一つずつ、自分の言葉で説明できるか確かめてください。</p>
+<div class="yoko box"><table><tr><th>章</th><th>キーワード</th></tr><tr><td class="nw">第一章</td><td>ビジネスの言語／貸借対照表／損益計算書／売上総利益／営業利益／経常利益／税金等調整前当期純利益／当期純利益／利害関係者／契約の集合体／意思決定支援機能／利害調整機能／実数分析／比率分析／構成比分析／関係比分析／趨勢比分析／時系列分析／クロスセクション分析／相対業績評価／決算短信／業績予想修正／資本コスト／ＥＤＩＮＥＴ／ＥＤＧＡＲ／ＩＲ／非財務情報／ＥＳＧ／利益マネジメント／粉飾／経済的帰結／収斂／全面適用／実証会計研究／反証可能</td></tr><tr><td class="nw">第二章</td><td>キャッシュ・フロー計算書／信用取引／設備投資／一致の原則／支払能力／資金繰り／客観性／連結キャッシュ・フロー計算書／営業活動によるキャッシュ・フロー／投資活動によるキャッシュ・フロー／財務活動によるキャッシュ・フロー／直接法／間接法／税金等調整前当期純利益／非キャッシュ損益項目／減価償却費／減損損失／引当金／運転資本／小計／表示区分／経営パターン／ライフサイクル／対角線</td></tr><tr><td class="nw">第三章</td><td>営業ＣＦマージン／自己資本営業ＣＦ比率／営業ＣＦ対流動負債比率／債務償還年数／有利子負債／営業ＣＦ対利払率／インタレスト・カバレッジ・レシオ／設備投資比率／正味設備投資額／投資ＣＦ対営業ＣＦ比率／フリー・キャッシュ・フロー／企業価値評価／間便法／ＮＯＰＬＡＴ／ＥＢＩＴ／ＣＡＰＥＸ／増加運転資本</td></tr><tr><td class="nw">第四章</td><td>業績の推移／成長性分析／前期比／趨勢比／ベース年度／年平均成長率／幾何平均／算術平均／売上高成長率／増収率／ベンチマーク／セグメント情報／生産、受注及び販売の状況／受注残高／使用総資本／内部留保／サステイナブル成長率／ＲＯＥ／配当性向／利益の質／利益の持続性／研究開発投資／情報の非対称性／設備の状況／従業員の状況／平均勤続年数／決算短信／経営者予想／予想の改訂／上方修正／下方修正／ＩＲカレンダー／ポートフォリオ／中央値／平均回帰</td></tr><tr><td class="nw">第五章</td><td>付加価値／経営資源／控除法／加算法／人件費／賃借料／金融費用／減価償却費／税金／税引後利益／粗付加価値／労働生産性／付加価値率／従業員一人当たり売上高／労働分配率／一人当たり人件費</td></tr><tr><td class="nw">第六章</td><td>経済的付加価値(ＥＶＡ)／税引後営業利益／期首投下資本／資本コスト／価値犠牲／割引率／切捨率／時間的価値／借入／社債／新株の発行／利益の留保／機会損失／リスクマネー／有限責任／加重平均資本コスト(ＷＡＣＣ)／資本構成／負債コスト／株主資本コスト／節税効果／実効税率／ＣＡＰＭ／リスクフリー・レート／市場ポートフォリオ／β</td></tr><tr><td class="nw">第七章</td><td>会計利益の質／発生主義会計／見積もり／恣意性／ノイズ／利益マネジメント／利益調整／利益数値制御／粉飾／機会主義的選択／効率的選択(効率的契約)／情報提供的選択／会計的裁量行動／実体的裁量行動／押し込み販売／表示区分シフティング／期間相互間／同一期間内／利益捻出型／利益圧縮型／利益平準化／ボーナス・プラン／目標利益／ビッグバス／財務制限条項／新規株式公開／マネジメント・バイアウト／政治的コスト／経営者交代／会計発生高／総会計発生高／裁量的会計発生高／非裁量的会計発生高／利益の分布テスト</td></tr></table></div>
+<h3 id="ap-4">想定問題一覧</h3>
+<p>各章の終わりに置いた問いを集めました。どれも「原因と結果」「違いと理由」をセットで答える形です。</p>
+<div class="yoko box"><table><tr><th>章</th><th>問い</th></tr><tr><td class="nw">第一章</td><td>財務諸表の「意思決定支援機能」と「利害調整機能」の違いを、利害関係者を一人選んで具体的に説明しなさい。</td></tr><tr><td class="nw">第一章</td><td>利益マネジメントとは何か。粉飾とどう違うか、また経営者が利益を調整しようとする理由とあわせて説明しなさい。</td></tr><tr><td class="nw">第二章</td><td>会計利益とキャッシュ・フローがずれる原因を二つあげ、それでも全期間では両者が一致する理由を説明しなさい。</td></tr><tr><td class="nw">第二章</td><td>営業ＣＦ＋・投資ＣＦ－・財務ＣＦ－の会社と、営業ＣＦ－・投資ＣＦ＋・財務ＣＦ＋の会社は、それぞれどのような状態だと読めるか。</td></tr><tr><td class="nw">第三章</td><td>フリー・キャッシュ・フローとは何か。二つの算定方法を示し、ＦＣＦがマイナスの会社をどう評価すべきか述べなさい。</td></tr><tr><td class="nw">第四章</td><td>年平均成長率を求めるとき、各年の前期比を単純に平均してはいけないのはなぜか。具体的な数値例を使って説明しなさい。</td></tr><tr><td class="nw">第四章</td><td>上場企業を売上高成長率で十のグループに分けて追跡すると、どのような傾向が見られるか。その現象の名前と、分析をするうえでの教訓を述べなさい。</td></tr><tr><td class="nw">第五章</td><td>付加価値の控除法と加算法を説明し、加算法の各項目がそれぞれだれへの分配にあたるかを述べなさい。</td></tr><tr><td class="nw">第五章</td><td>ある会社の労働分配率が前の年より上がった。考えられる原因を、分解式を使って二つ述べなさい。</td></tr><tr><td class="nw">第六章</td><td>株主資本コストが負債コストより高くなるのはなぜか。また、利益の留保(内部留保)にもコストがあると言えるのはなぜか。</td></tr><tr><td class="nw">第六章</td><td>黒字の会社でも経済的付加価値(ＥＶＡ)がマイナスになることがある。その理由を、資本コストの考え方を使って説明しなさい。</td></tr><tr><td class="nw">第七章</td><td>会計的裁量行動と実体的裁量行動の違いを、それぞれ具体例をあげて説明しなさい。</td></tr><tr><td class="nw">第七章</td><td>標準的なボーナス・プランのもとで、経営者の利益マネジメントの戦略が利益の水準によってどう変わるかを説明しなさい。</td></tr></table></div>
+
+<h3 id="ap-5">注意して読む箇所の一覧</h3>
+<p>本文に印をつけた箇所を集めました。［補足］は資料に書かれていないことを補った箇所、［要確認］は推定で書いた箇所、［講義］は講義動画で先生が口頭で補足した箇所です。試験の直前に、ここだけ見返してください。</p>
+<div id="taglist-slot"></div>
+
+<h3 id="ap-6">読み終えたあとに</h3>
+<p>読み物は、理解には強い一方で、記憶の定着には弱いものです。すらすら読めることと、試験で思い出せることは別の力です。各章の終わりのキーワードを見て、本を閉じ、声に出して説明してみる。説明につまったところが、もう一度読む場所です。</p>
+
+<div class="end">
+<p class="end-h">この本の核心</p>
+<ol>
+<li>利益は「意見」、お金は「事実」。二つのズレを読むことが、会社を読むことの半分である。</li>
+<li>伸び・価値・コストは、すべて「何と比べるか」で意味が決まる。</li>
+<li>有用な数字ほど動かされる。だから分析する人は、数字を疑う目を持つ。</li>
+</ol>
+</div>
+</section>
+
+</div>
+
+<script>
+"use strict";
+/* ===== 設定 ===== */
+const BOOK_ID = "keiei2-2026";
+const SB_URL = "https://gzayrjlhruhvklsidraw.supabase.co";
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6YXlyamxocnVodmtsc2lkcmF3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyNDM0NTksImV4cCI6MjEwMDgxOTQ1OX0.ZXaigzh2qWs1yK_CJkW9BYvN4s4Cl8p1adHu6ZcqSPU";
+const LS_KEY = "shinsho:" + BOOK_ID;
+const LS_PREF = "shinsho:pref";
+const DEVICE = (() => { const u = navigator.userAgent; if (/iPad/.test(u) || (/Macintosh/.test(u) && navigator.maxTouchPoints > 1)) return "iPad"; if (/iPhone/.test(u)) return "iPhone"; if (/Android/.test(u)) return "Android"; return "パソコン"; })();
+
+/* ===== 状態(1項目1キー、tsが新しい方が勝つ) ===== */
+// items[key] = {v, ts, dirty}
+//   pos:<ch>  {p: 0〜1}       章の中の位置
+//   st:<ch>   "reading"|"done" 章の状態(無ければ未読)
+//   sec:<id>  1               節を読んだ
+//   chk:<id>  true/false      章末のチェック
+//   last      {ch, p, dev}    最後に読んでいた場所
+let store = { items: {} };
+try { const s = JSON.parse(localStorage.getItem(LS_KEY) || "null"); if (s && s.items) store = s; } catch (e) {}
+const saveLocal = () => { try { localStorage.setItem(LS_KEY, JSON.stringify(store)); } catch (e) {} };
+const get = k => store.items[k] ? store.items[k].v : undefined;
+function set(k, v) {
+  const cur = store.items[k];
+  if (cur && JSON.stringify(cur.v) === JSON.stringify(v)) return;
+  store.items[k] = { v, ts: Date.now(), dirty: true };
+  saveLocal(); schedulePush();
+}
+
+/* ===== 同期 ===== */
+let pushTimer = null, syncing = false;
+const syncEl = document.getElementById("sync"), syncTxt = document.getElementById("synctxt");
+function syncStatus(kind, text) { syncEl.className = "sync " + kind; syncTxt.textContent = text; }
+function schedulePush() { clearTimeout(pushTimer); pushTimer = setTimeout(push, 1500); }
+async function sb(path, body) {
+  const r = await fetch(SB_URL + path, { method: body ? "POST" : "GET", headers: { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY, "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+  if (!r.ok) throw new Error(r.status + " " + await r.text());
+  return r.json();
+}
+async function pull() {
+  const rows = await sb(`/rest/v1/shinsho_progress?book_id=eq.${encodeURIComponent(BOOK_ID)}&select=item_key,value,ts,device`);
+  let changed = false;
+  for (const r of rows) {
+    const cur = store.items[r.item_key];
+    if (!cur || Number(r.ts) > cur.ts) { store.items[r.item_key] = { v: r.value, ts: Number(r.ts), dirty: false, dev: r.device }; changed = true; }
+  }
+  // クラウドが空でも端末の記録は消さない(送り直すだけ)
+  if (changed) saveLocal();
+  return changed;
+}
+async function push() {
+  const dirty = Object.entries(store.items).filter(([, it]) => it.dirty);
+  if (!dirty.length) return;
+  if (!navigator.onLine) { syncStatus("off", "オフライン。記録は端末に保存し、つながったら送ります"); return; }
+  const sentTs = {};
+  const payload = dirty.map(([k, it]) => { sentTs[k] = it.ts; return { k, v: it.v, ts: it.ts }; });
+  try {
+    await sb("/rest/v1/rpc/shinsho_progress_push", { p_book: BOOK_ID, p_items: payload, p_device: DEVICE });
+    for (const k in sentTs) if (store.items[k] && store.items[k].ts === sentTs[k]) store.items[k].dirty = false;
+    saveLocal(); syncStatus("ok", "同期ずみ " + new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }));
+  } catch (e) { syncStatus("off", "同期できませんでした。記録は端末に残っています"); }
+}
+async function syncAll(reason) {
+  if (syncing) return; syncing = true;
+  try {
+    if (!navigator.onLine) { syncStatus("off", "オフライン。端末に保存した内容で読めます"); return; }
+    const changed = await pull();
+    await push();
+    syncStatus("ok", "同期ずみ " + new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }));
+    if (changed) { renderHome(); if (reason === "resume") maybeOfferRemote(); }
+  } catch (e) { syncStatus("off", "同期できませんでした。端末に保存した内容で読めます"); }
+  finally { syncing = false; }
+}
+window.addEventListener("online", () => syncAll("online"));
+window.addEventListener("offline", () => syncStatus("off", "オフライン。記録は端末に保存し、つながったら送ります"));
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") syncAll("resume"); else { savePos(true); push(); } });
+window.addEventListener("pagehide", () => { savePos(true); });
+
+/* ===== 本の中身 ===== */
+const bookEl = document.getElementById("book");
+const chapters = [...bookEl.querySelectorAll("section.chapter")].map(s => ({
+  id: s.id, title: s.dataset.title, src: s.dataset.src || "", no: s.querySelector(".ch-no") ? s.querySelector(".ch-no").textContent : "",
+  secs: [...s.querySelectorAll("h3[id]")].map(h => ({ id: h.id, title: h.textContent })), el: s
+}));
+
+// 縦書きで読みやすいよう、本文中の1〜2桁の数字と％を縦中横にする(横書きの箱の中は触らない)
+function tcy(root) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: n => n.parentElement.closest(".yoko,svg,.tcy,script,style") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+  const nodes = []; while (walker.nextNode()) nodes.push(walker.currentNode);
+  for (const n of nodes) {
+    const t = n.nodeValue; const re = /(?<![0-9０-９.,])([0-9]{1,2})(?![0-9０-９.,])/g;
+    if (!re.test(t)) continue; re.lastIndex = 0;
+    const frag = document.createDocumentFragment(); let last = 0, m;
+    while ((m = re.exec(t))) { frag.append(t.slice(last, m.index)); const sp = document.createElement("span"); sp.className = "tcy"; sp.textContent = m[1]; frag.append(sp); last = m.index + m[1].length; }
+    frag.append(t.slice(last)); n.replaceWith(frag);
+  }
+}
+
+/* ===== 表紙・目次 ===== */
+const stateOf = id => get("st:" + id) || ((get("pos:" + id) || {}).p > 0.01 ? "reading" : "unread");
+const label = { unread: "未読", reading: "読み途中", done: "読了" };
+function renderHome() {
+  const toc = document.getElementById("toc"); toc.innerHTML = "";
+  let doneCount = 0, sum = 0;
+  for (const c of chapters) {
+    const st = stateOf(c.id); const p = st === "done" ? 1 : ((get("pos:" + c.id) || {}).p || 0);
+    if (st === "done") doneCount++; sum += p;
+    const li = document.createElement("li");
+    const row = document.createElement("button"); row.className = "toc-row";
+    row.innerHTML = `<span class="no"></span><span class="tt"></span><span class="state ${st}"></span>`;
+    row.querySelector(".no").textContent = c.no || "";
+    row.querySelector(".tt").textContent = c.title; const sm = document.createElement("small"); sm.textContent = c.src; row.querySelector(".tt").append(sm);
+    row.querySelector(".state").textContent = st === "reading" ? `読み途中 ${Math.round(p * 100)}%` : label[st];
+    row.onclick = () => openChapter(c.id, st === "done" ? 0 : null);
+    li.append(row);
+    if (c.secs.length) {
+      const ul = document.createElement("ul"); ul.className = "secs";
+      for (const s of c.secs) {
+        const b = document.createElement("button"); if (get("sec:" + s.id)) b.className = "read";
+        b.innerHTML = '<span class="dot"></span><span></span>'; b.lastChild.textContent = s.title;
+        b.onclick = () => openChapter(c.id, null, s.id);
+        const sli = document.createElement("li"); sli.append(b); ul.append(sli);
+      }
+      li.append(ul);
+    }
+    toc.append(li);
+  }
+  document.getElementById("allbar").style.width = (sum / chapters.length * 100).toFixed(1) + "%";
+  document.getElementById("alltxt").textContent = `全${chapters.length}章のうち ${doneCount}章を読了(全体の ${Math.round(sum / chapters.length * 100)}%)`;
+  const last = get("last"); const btn = document.getElementById("resume");
+  const lc = last && chapters.find(c => c.id === last.ch);
+  if (lc) {
+    const lastItem = store.items["last"];
+    const when = new Date(lastItem.ts).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    btn.hidden = false;
+    btn.innerHTML = `<span class="k">前回はここまで読んでいました</span><span class="t"></span><span class="s"></span><span class="bar"><i></i></span>`;
+    btn.querySelector(".t").textContent = `${lc.no}　${lc.title}`;
+    btn.querySelector(".s").textContent = `${Math.round((last.p || 0) * 100)}% ・ ${last.dev || ""}で ${when} ・ タップで続きから`;
+    btn.querySelector("i").style.width = Math.round((last.p || 0) * 100) + "%";
+    btn.onclick = () => openChapter(lc.id, last.p);
+  } else btn.hidden = true;
+}
+
+/* ===== 読書画面 ===== */
+const page = document.getElementById("page");
+let cur = null, ready = false;
+const maxScroll = () => Math.max(1, page.scrollWidth - page.clientWidth);
+const getP = () => Math.min(1, Math.abs(page.scrollLeft) / maxScroll());
+const setP = p => { page.scrollLeft = -p * maxScroll(); if (Math.abs(page.scrollLeft) < 1 && p > 0) page.scrollLeft = p * maxScroll(); };
+
+function openChapter(id, p, secId) {
+  const c = chapters.find(x => x.id === id); if (!c) return;
+  cur = c; ready = false;
+  document.getElementById("home").hidden = true; document.getElementById("reader").hidden = false;
+  page.innerHTML = ""; const clone = c.el.cloneNode(true); clone.removeAttribute("id"); page.append(clone);
+  // 章末:チェック欄と「読了」「次の章」
+  const end = clone.querySelector(".end");
+  if (end) {
+    const items = [...end.querySelectorAll("ol")[0]?.querySelectorAll("li") || []];
+    const box = document.createElement("div"); box.className = "checks";
+    const h = document.createElement("p"); h.className = "end-h"; h.textContent = "説明できるか、本を閉じて試してみる";
+    items.forEach((li, i) => {
+      const key = `chk:${c.id}-${i + 1}`;
+      const lab = document.createElement("label"); lab.className = "chk";
+      const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !!get(key);
+      cb.onchange = () => set(key, cb.checked);
+      const sp = document.createElement("span"); sp.textContent = "核心" + (i + 1) + "を自分の言葉で言える";
+      lab.append(cb, sp); box.append(lab);
+    });
+    if (items.length) { end.append(h, box); }
+  }
+  const tail = document.createElement("div"); tail.className = "tail";
+  const db = document.createElement("button"); db.className = "done-btn"; db.textContent = stateOf(c.id) === "done" ? "読了ずみ" : "この章を読了にする";
+  db.onclick = () => { set("st:" + c.id, "done"); db.textContent = "読了ずみ"; toast("読了にしました"); };
+  tail.append(db);
+  const idx = chapters.indexOf(c);
+  if (chapters[idx + 1]) { const nb = document.createElement("button"); nb.className = "next-btn"; nb.textContent = "次の章へ　" + chapters[idx + 1].title; nb.onclick = () => openChapter(chapters[idx + 1].id, 0); tail.append(nb); }
+  clone.append(tail);
+  tcy(clone);
+  // 巻末の一覧(タグの付いた箇所)を組み立てる
+  const tl = clone.querySelector("#taglist-slot"); if (tl) buildTagList(tl);
+  document.getElementById("ttl").textContent = c.title;
+  document.getElementById("runhead").textContent = c.no ? `${c.no}　${c.title}` : c.title;
+  document.getElementById("markdone").textContent = stateOf(c.id) === "done" ? "読了ずみ" : "読了にする";
+  document.body.classList.add("reading-calm");
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (secId) { const h = clone.querySelector("#" + CSS.escape(secId)); if (h) h.scrollIntoView({ inline: "start", block: "nearest" }); }
+    else setP(p == null ? ((get("pos:" + c.id) || {}).p || 0) : p);
+    ready = true; onScroll();
+    if (stateOf(c.id) === "unread") set("st:" + c.id, "reading");
+  }));
+  try { history.replaceState(null, "", "#" + c.id); } catch (e) {}
+}
+function closeReader() {
+  savePos(true); cur = null;
+  document.getElementById("reader").hidden = true; document.getElementById("home").hidden = false;
+  try { history.replaceState(null, "", location.pathname); } catch (e) {}
+  renderHome();
+}
+let posTimer = null;
+function savePos(now) {
+  if (!cur || !ready) return;
+  const p = Math.round(getP() * 1000) / 1000;
+  const doit = () => { set("pos:" + cur.id, { p }); set("last", { ch: cur.id, p, dev: DEVICE }); };
+  clearTimeout(posTimer); if (now) doit(); else posTimer = setTimeout(doit, 800);
+}
+function markSections() {
+  if (!cur) return;
+  // 節の終わり(次の節の見出しか章末)が画面に入るか通り過ぎたら、その節は読んだことにする
+  const pr = page.getBoundingClientRect();
+  const hs = [...page.querySelectorAll("h3[id]")];
+  hs.forEach((h, i) => {
+    const nxt = hs[i + 1]; const endEl = nxt || page.querySelector(".end") || page.querySelector(".tail");
+    if (!endEl) return;
+    const r = endEl.getBoundingClientRect();
+    // 縦書きは左へ進むので、通り過ぎたものは画面の右側にある
+    if (r.left >= pr.left && r.left <= pr.right) set("sec:" + h.id, 1);
+    else if (r.left > pr.right) set("sec:" + h.id, 1);
+  });
+}
+function onScroll() {
+  if (!cur || !ready) return;
+  const p = getP();
+  document.getElementById("pct").textContent = Math.round(p * 100) + "%";
+  document.getElementById("seek").value = Math.round(p * 1000);
+  const totalPages = Math.max(1, Math.ceil(page.scrollWidth / page.clientWidth));
+  const now = Math.min(totalPages, Math.floor(Math.abs(page.scrollLeft) / page.clientWidth) + 1);
+  document.getElementById("folio").textContent = `${now} / ${totalPages}`;
+  document.getElementById("chpos").textContent = `${chapters.indexOf(cur) + 1} / ${chapters.length}章`;
+  savePos(false); markSections();
+  if (p > 0.995 && stateOf(cur.id) !== "done") { set("st:" + cur.id, "done"); document.getElementById("markdone").textContent = "読了ずみ"; toast("この章を読み終えました"); }
+}
+page.addEventListener("scroll", onScroll, { passive: true });
+
+// ページ送り:左側タップ=次(縦書きは左へ進む)、右側タップ=前、真ん中=帯を出す
+const gutter = () => { const cs = getComputedStyle(page); return { l: parseFloat(cs.paddingLeft), r: parseFloat(cs.paddingRight) }; };
+function turn(dir) {
+  const g = gutter();
+  page.scrollBy({ left: -dir * (page.clientWidth - g.l - g.r), behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+}
+// 止まったところで、右端の行が欠けていたら、その行が丸ごと見える位置まで少し戻す(紙の本のように行の途中でページが切れないように)
+function alignLine() {
+  if (!cur) return;
+  const pr = page.getBoundingClientRect(), g = gutter();
+  const edge = pr.right - g.r;
+  for (const y of [0.5, 0.35, 0.65].map(f => pr.top + pr.height * f)) {
+    const range = document.caretRangeFromPoint ? document.caretRangeFromPoint(edge - 2, y) : null;
+    if (!range || !page.contains(range.startContainer) || range.startContainer.parentElement.closest(".yoko")) continue;
+    // 一文字ぶんの範囲にして、その字の右端(＋行間の半分)を行の右端とみなす
+    const node = range.startContainer, off = range.startOffset;
+    if (node.nodeType !== 3 || !node.length) continue;
+    range.setStart(node, Math.min(off, node.length - 1)); range.setEnd(node, Math.min(off, node.length - 1) + 1);
+    const r = range.getBoundingClientRect();
+    if (!r || !r.width) continue;
+    const cs = getComputedStyle(node.parentElement);
+    const half = Math.max(0, (parseFloat(cs.lineHeight) - parseFloat(cs.fontSize)) / 2) || 0;
+    const d = r.right + half - edge;
+    if (d > 1 && d < 60) page.scrollLeft += d;
+    break;
+  }
+  hideCutLeft();
+}
+// 左端で途中まで見えている行は、紙色の帯を広げて隠す(次のページで丸ごと読める)
+function hideCutLeft() {
+  const gl = document.querySelector(".gut.l"); gl.style.width = "";
+  const pr = page.getBoundingClientRect(), g = gutter(), edge = pr.left + g.l;
+  let cover = 0;
+  for (const y of [0.3, 0.5, 0.7].map(f => pr.top + pr.height * f)) {
+    const range = document.caretRangeFromPoint ? document.caretRangeFromPoint(edge + 2, y) : null;
+    if (!range || !page.contains(range.startContainer) || range.startContainer.nodeType !== 3) continue;
+    const node = range.startContainer, o = Math.min(range.startOffset, node.length - 1);
+    if (o < 0 || node.parentElement.closest(".yoko")) continue;
+    range.setStart(node, o); range.setEnd(node, o + 1);
+    const r = range.getBoundingClientRect();
+    if (r.width && r.left < edge - 1) {
+      const cs = getComputedStyle(node.parentElement);
+      const half = Math.max(0, (parseFloat(cs.lineHeight) - parseFloat(cs.fontSize)) / 2) || 0;
+      cover = Math.max(cover, r.right + half - pr.left);
+    }
+  }
+  // 図・表の箱が左端にかかっていたら、箱ごと次のページに回す
+  for (const b of page.querySelectorAll(".yoko,.aside,.lecture")) {
+    const r = b.getBoundingClientRect();
+    if (r.left < edge - 1 && r.right > edge + 1) cover = Math.max(cover, r.right + 8 - pr.left);
+  }
+  if (cover > g.l && cover < pr.width * 0.75) gl.style.width = Math.ceil(cover) + "px";
+}
+let endTimer;
+page.addEventListener("scroll", () => { clearTimeout(endTimer); document.querySelector(".gut.l").style.width = ""; endTimer = setTimeout(alignLine, 180); }, { passive: true });
+page.addEventListener("click", e => {
+  if (e.target.closest("button,input,label,summary,a,details")) return;
+  if (getSelection && String(getSelection()).length) return;
+  const x = e.clientX / innerWidth;
+  if (x < 0.3) turn(1); else if (x > 0.7) turn(-1); else document.body.classList.toggle("reading-calm");
+});
+document.addEventListener("keydown", e => {
+  if (!cur) return;
+  if (e.key === "ArrowLeft" || e.key === " " || e.key === "PageDown") { e.preventDefault(); turn(1); }
+  else if (e.key === "ArrowRight" || e.key === "PageUp") { e.preventDefault(); turn(-1); }
+  else if (e.key === "Escape") closeReader();
+});
+document.getElementById("seek").addEventListener("input", e => setP(e.target.value / 1000));
+document.getElementById("back").onclick = closeReader;
+document.getElementById("markdone").onclick = () => { if (!cur) return; set("st:" + cur.id, "done"); document.getElementById("markdone").textContent = "読了ずみ"; toast("読了にしました"); };
+document.getElementById("prevch").onclick = () => { const i = chapters.indexOf(cur); if (i > 0) openChapter(chapters[i - 1].id, null); };
+document.getElementById("nextch").onclick = () => { const i = chapters.indexOf(cur); if (chapters[i + 1]) openChapter(chapters[i + 1].id, null); };
+
+/* ===== 文字の大きさ・表示(端末ごと) ===== */
+let pref = { fs: 0, theme: "" };
+try { pref = Object.assign(pref, JSON.parse(localStorage.getItem(LS_PREF) || "{}")); } catch (e) {}
+function applyPref() {
+  const base = innerWidth >= 1000 && innerHeight >= 700 ? 21 : innerWidth >= 700 ? 20 : 18;
+  document.documentElement.style.setProperty("--fs", (base + pref.fs) + "px");
+  if (pref.theme) document.documentElement.setAttribute("data-theme", pref.theme); else document.documentElement.removeAttribute("data-theme");
+  document.getElementById("theme").textContent = "表示:" + ({ "": "端末に合わせる", light: "明るい", dark: "暗い" })[pref.theme];
+  try { localStorage.setItem(LS_PREF, JSON.stringify(pref)); } catch (e) {}
+}
+function fsChange(d) { const p = cur ? getP() : 0; pref.fs = Math.max(-3, Math.min(6, pref.fs + d)); applyPref(); if (cur) requestAnimationFrame(() => setP(p)); }
+["fsminus", "rfsminus"].forEach(id => document.getElementById(id).onclick = () => fsChange(-1));
+["fsplus", "rfsplus"].forEach(id => document.getElementById(id).onclick = () => fsChange(1));
+document.getElementById("theme").onclick = () => { pref.theme = ({ "": "light", light: "dark", dark: "" })[pref.theme]; applyPref(); };
+let rz; window.addEventListener("resize", () => { const p = cur ? getP() : 0; clearTimeout(rz); rz = setTimeout(() => { applyPref(); if (cur) setP(p); }, 150); });
+
+/* ===== 他の端末で先に進んでいたら知らせる ===== */
+function maybeOfferRemote() {
+  const it = store.items["last"]; if (!it || !it.dev || it.dev === DEVICE) return;
+  const v = it.v; const c = chapters.find(x => x.id === v.ch); if (!c) return;
+  if (cur && cur.id === c.id && Math.abs(getP() - v.p) < 0.02) return;
+  toast(`${it.dev}で「${c.title}」の ${Math.round(v.p * 100)}% まで読んでいます`, "そこへ移動", () => openChapter(c.id, v.p));
+}
+let toastTimer;
+function toast(msg, act, fn) {
+  document.querySelectorAll(".toast").forEach(t => t.remove());
+  const t = document.createElement("div"); t.className = "toast"; t.setAttribute("role", "status");
+  const s = document.createElement("span"); s.textContent = msg; t.append(s);
+  if (act) { const b = document.createElement("button"); b.textContent = act; b.onclick = () => { t.remove(); fn(); }; t.append(b); }
+  document.body.append(t); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.remove(), act ? 9000 : 2500);
+}
+
+/* ===== 巻末:タグの付いた箇所の一覧 ===== */
+function buildTagList(slot) {
+  const kinds = { "補足": "資料に無いことを補った箇所", "要確認": "推定で書いた箇所", "講義": "講義動画で先生が口頭で補足した箇所" };
+  for (const k of Object.keys(kinds)) {
+    const rows = [];
+    for (const c of chapters) for (const tg of c.el.querySelectorAll(".tag-" + k)) {
+      const sec = (() => { let n = tg; while (n && n !== c.el) { let s = n.previousElementSibling; while (s) { if (s.matches("h3")) return s.textContent; s = s.previousElementSibling; } n = n.parentElement; } return ""; })();
+      const host = tg.closest("p,li,.aside,.lecture") || tg.parentElement;
+      const txt = host.textContent.replace(/\s+/g, " ").replace(k, "").trim();
+      rows.push([c.no || c.title, sec, txt.length > 70 ? txt.slice(0, 70) + "…" : txt]);
+    }
+    const box = document.createElement("div"); box.className = "yoko box";
+    box.innerHTML = `<p class="box-h"></p><table><tr><th>章</th><th>節</th><th>箇所</th></tr></table>`;
+    box.querySelector(".box-h").textContent = `［${k}］${kinds[k]}(${rows.length}か所)`;
+    const tb = box.querySelector("table");
+    for (const r of rows) { const tr = document.createElement("tr"); r.forEach(x => { const td = document.createElement("td"); td.textContent = x; tr.append(td); }); tb.append(tr); }
+    slot.append(box);
+  }
+}
+
+/* ===== 起動 ===== */
+applyPref(); renderHome();
+syncStatus(navigator.onLine ? "" : "off", navigator.onLine ? "同期しています…" : "オフライン。端末に保存した内容で読めます");
+syncAll("resume").then(() => {
+  const h = location.hash.slice(1);
+  if (h && chapters.find(c => c.id === h)) openChapter(h, null);
+});
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+</script>
+</body>
+</html>
