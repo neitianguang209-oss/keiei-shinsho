@@ -87,7 +87,9 @@ button{font:inherit;color:inherit}
 /* ページは指で払うかタップで1枚ずつめくる(Kindle と同じく、途中で止まる流し読みにはしない)。そのため横のスクロールはさせず、めくりはプログラムで行う */
 #page{flex:1;min-height:0;overflow-x:hidden;overflow-y:hidden;touch-action:pan-y pinch-zoom;
   writing-mode:vertical-rl;font-size:var(--fs);line-height:var(--lh);font-family:var(--bodyfont);
-  padding:calc(env(safe-area-inset-top) + 34px) max(var(--mx),env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 34px) max(var(--mx),env(safe-area-inset-left));
+  padding:calc(env(safe-area-inset-top) + var(--padY,34px)) max(var(--mx),env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + var(--padY,34px)) max(var(--mx),env(safe-area-inset-left));
+  /* 句読点を行末にぶら下げ、行頭に「、」「。」が来ないようにする(紙の本の組み方) */
+  line-break:strict;hanging-punctuation:allow-end last;word-break:normal;
   text-align:justify;font-feature-settings:"palt" 0;scrollbar-width:none;overscroll-behavior-x:contain}
 #page::-webkit-scrollbar{display:none}
 #page .chapter{display:block}
@@ -242,6 +244,11 @@ body.listening .folio{display:none}
 body.listening #home{padding-bottom:calc(var(--playerH,0px) + 24px)}
 body.listening .foot{display:none}
 .chrome .row button{flex:1 1 auto;padding:6px 4px;font-size:12px;white-space:nowrap}
+/* 操作の文字は端末の大きさに合わせる(iPad では少し大きく、押しやすく) */
+.chrome,.sheet-body{font-size:var(--ui,13px)}
+.chrome .row button,.chrome button{font-size:calc(var(--ui,13px) - 1px);min-height:calc(var(--ui,13px) * 2.8)}
+.foot,.runhead{font-size:calc(var(--ui,13px) - 3px)}
+.seltool{font-size:var(--ui,13px)}
 @media (max-width:520px){ #page .yoko table{font-size:.8em} #page .yoko th,#page .yoko td{padding:4px 5px} #page .yoko{padding:12px 10px} }
 @media (min-width:700px){ :root{--fs:20px} .cover-title{font-size:44px} }
 @media (min-width:1000px) and (min-height:700px){ :root{--fs:21px} }
@@ -337,6 +344,7 @@ body.listening .foot{display:none}
   <div class="opt"><span>書体</span><div class="seg" id="aa-font"><button data-v="mincho" style="font-family:var(--mincho)">明朝</button><button data-v="gothic" style="font-family:var(--gothic)">ゴシック</button></div></div>
   <div class="opt"><span>行間</span><div class="seg" id="aa-lh"><button data-v="0">狭め</button><button data-v="1">ふつう</button><button data-v="2">広め</button></div></div>
   <div class="opt"><span>左右の余白</span><div class="seg" id="aa-mx"><button data-v="0">狭め</button><button data-v="1">ふつう</button><button data-v="2">広め</button></div></div>
+  <div class="opt"><span>ページをめくるときの動き</span><div class="seg" id="aa-anim"><button data-v="1">すべらせる</button><button data-v="0">パッと切り替える</button></div></div>
   <div class="opt"><span>紙の色</span><div class="seg" id="aa-theme">
     <button data-v=""><span class="sw" style="background:linear-gradient(90deg,#f3f2ec 50%,#1b1a18 50%)"></span>端末に合わせる</button>
     <button data-v="light"><span class="sw" style="background:#f3f2ec"></span>白</button>
@@ -2042,8 +2050,10 @@ function openChapter(id, p, secId) {
   document.getElementById("markdone").textContent = stateOf(c.id) === "done" ? "読了ずみ" : "読了にする";
   document.body.classList.add("reading-calm");
   afterLayout(() => {
+    pages = []; buildPages();
     if (secId) { const h = clone.querySelector("#" + CSS.escape(secId)); if (h) scrollToEl(h); }
     else setP(p == null ? ((get("pos:" + c.id) || {}).p || 0) : p);
+    alignLine();
     ready = true; onScroll();
     if (stateOf(c.id) === "unread") set("st:" + c.id, "reading");
   });
@@ -2095,8 +2105,8 @@ function onScroll() {
   const p = getP();
   document.getElementById("pct").textContent = Math.round(p * 100) + "%";
   document.getElementById("seek").value = Math.round(p * 1000);
-  const totalPages = Math.max(1, Math.ceil(page.scrollWidth / page.clientWidth));
-  const now = Math.min(totalPages, Math.floor(Math.abs(page.scrollLeft) / page.clientWidth) + 1);
+  const totalPages = Math.max(1, pages.length || Math.ceil(page.scrollWidth / page.clientWidth));
+  const now = pages.length ? pageAt(page.scrollLeft) + 1 : Math.min(totalPages, Math.floor(Math.abs(page.scrollLeft) / page.clientWidth) + 1);
   document.getElementById("folio").textContent = `${now} / ${totalPages}`;
   document.getElementById("chpos").textContent = `${chapters.indexOf(cur) + 1} / ${chapters.length}章`;
   updateFoot(p, now, totalPages);
@@ -2107,59 +2117,72 @@ page.addEventListener("scroll", onScroll, { passive: true });
 
 // ページ送り:左側タップ=次(縦書きは左へ進む)、右側タップ=前、真ん中=帯を出す
 const gutter = () => { const cs = getComputedStyle(page); return { l: parseFloat(cs.paddingLeft), r: parseFloat(cs.paddingRight) }; };
-function turn(dir) {
-  const g = gutter();
-  page.scrollBy({ left: -dir * (page.clientWidth - g.l - g.r), behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+/* ===== ページ割り(Kindle と同じく、ページの区切りを前もって決める) =====
+   章を開いたとき(と、文字の大きさや画面の向きが変わったとき)に、本文のすべての行(縦の1列)と図・表の箱の位置を調べ、
+   「このページはこの行からこの行まで」を計算しておく。めくるときはその区切りどおりに動かすので、行が飛んだり欠けたりしない。
+   位置は「内容の座標」xc = 画面の x + scrollLeft で表す(縦書きは scrollLeft が 0 から負の向きへ進む) */
+let pages = [], pageIdx = 0;
+function layoutUnits() {
+  const sl = page.scrollLeft, units = [];
+  const boxes = [...page.querySelectorAll(".yoko")];
+  for (const b of boxes) { const r = b.getBoundingClientRect(); if (r.width) units.push({ l: r.left + sl, r: r.right + sl, box: true }); }
+  const w = document.createTreeWalker(page, NodeFilter.SHOW_TEXT, { acceptNode: n => !n.nodeValue.trim() || n.parentElement.closest(".yoko,svg") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+  const rg = document.createRange();
+  while (w.nextNode()) { rg.selectNodeContents(w.currentNode); for (const rc of rg.getClientRects()) if (rc.width > 1) units.push({ l: rc.left + sl, r: rc.right + sl }); }
+  for (const el of page.querySelectorAll("button,.checks,.chk,h3")) { const r = el.getBoundingClientRect(); if (r.width) units.push({ l: r.left + sl, r: r.right + sl }); }
+  // 右から順に並べ、同じ列(重なり合うもの)は一つにまとめる
+  units.sort((a, b) => b.r - a.r);
+  const merged = [];
+  for (const u of units) { const m = merged[merged.length - 1]; if (m && u.r > m.l + 1) { m.l = Math.min(m.l, u.l); } else merged.push({ l: u.l, r: u.r }); }
+  return merged;
 }
-// 止まったところで、右端の行が欠けていたら、その行が丸ごと見える位置まで少し戻す(紙の本のように行の途中でページが切れないように)
-function alignLine() {
+function buildPages() {
   if (!cur) return;
+  const g = gutter(), pr = page.getBoundingClientRect();
+  const L = pr.left + g.l, R = pr.right - g.r, W = R - L;
+  const minS = -(page.scrollWidth - page.clientWidth), clampS = s => Math.min(0, Math.max(minS, s));
+  const fs = parseFloat(getComputedStyle(page).fontSize), m = Math.max(2, fs * (parseFloat(getComputedStyle(page).lineHeight) / fs - 1) / 2);
+  const units = layoutUnits(); pages = [];
+  if (!units.length) { pages = [{ s: 0, last: 0 }]; return; }
+  let i = 0, s = 0;
+  while (i < units.length && pages.length < 2000) {
+    // このページは units[i] から。右端(R)に units[i] の右端が来るよう置く
+    s = pages.length === 0 ? 0 : clampS(units[i].r + m - R);
+    let j = i;
+    while (j + 1 < units.length && units[j + 1].l - s >= L - 0.5) j++;
+    if (j === i && units[i].l - s < L - 0.5 && pages.length) { /* 1ページより大きい箱:そのまま1ページに */ }
+    pages.push({ s, cut: units[j].l - m }); // cut:この内容座標より左は隠す
+    i = j + 1;
+    if (s === minS) break;
+  }
+}
+function pageAt(sl) { let best = 0; pages.forEach((pg, i) => { if (Math.abs(pg.s - sl) < Math.abs(pages[best].s - sl)) best = i; }); return best; }
+function applyCover() {
+  const gl = document.querySelector(".gut.l"), pg = pages[pageIdx]; gl.style.width = "";
+  if (!pg) return;
   const pr = page.getBoundingClientRect(), g = gutter();
-  const edge = pr.right - g.r;
-  for (const y of [0.5, 0.35, 0.65].map(f => pr.top + pr.height * f)) {
-    const range = document.caretRangeFromPoint ? document.caretRangeFromPoint(edge - 2, y) : null;
-    if (!range || !page.contains(range.startContainer) || range.startContainer.parentElement.closest(".yoko")) continue;
-    // 一文字ぶんの範囲にして、その字の右端(＋行間の半分)を行の右端とみなす
-    const node = range.startContainer, off = range.startOffset;
-    if (node.nodeType !== 3 || !node.length) continue;
-    range.setStart(node, Math.min(off, node.length - 1)); range.setEnd(node, Math.min(off, node.length - 1) + 1);
-    const r = range.getBoundingClientRect();
-    if (!r || !r.width) continue;
-    const cs = getComputedStyle(node.parentElement);
-    const half = Math.max(0, (parseFloat(cs.lineHeight) - parseFloat(cs.fontSize)) / 2) || 0;
-    const d = r.right + half - edge;
-    if (d > 1 && d < 60) page.scrollLeft += d;
-    break;
-  }
-  hideCutLeft();
+  const x = pg.cut - page.scrollLeft - pr.left; // 隠す境目(画面の x、左端から)
+  if (x > g.l && x < pr.width * 0.95) gl.style.width = Math.ceil(x) + "px";
 }
-// 左端で途中まで見えている行は、紙色の帯を広げて隠す(次のページで丸ごと読める)
-function hideCutLeft() {
-  const gl = document.querySelector(".gut.l"); gl.style.width = "";
-  const pr = page.getBoundingClientRect(), g = gutter(), edge = pr.left + g.l;
-  let cover = 0;
-  for (const y of [0.3, 0.5, 0.7].map(f => pr.top + pr.height * f)) {
-    const range = document.caretRangeFromPoint ? document.caretRangeFromPoint(edge + 2, y) : null;
-    if (!range || !page.contains(range.startContainer) || range.startContainer.nodeType !== 3) continue;
-    const node = range.startContainer, o = Math.min(range.startOffset, node.length - 1);
-    if (o < 0 || node.parentElement.closest(".yoko")) continue;
-    range.setStart(node, o); range.setEnd(node, o + 1);
-    const r = range.getBoundingClientRect();
-    if (r.width && r.left < edge - 1) {
-      const cs = getComputedStyle(node.parentElement);
-      const half = Math.max(0, (parseFloat(cs.lineHeight) - parseFloat(cs.fontSize)) / 2) || 0;
-      cover = Math.max(cover, r.right + half - pr.left);
-    }
-  }
-  // 図・表の箱が左端にかかっていたら、箱ごと次のページに回す
-  for (const b of page.querySelectorAll(".yoko,.aside,.lecture")) {
-    const r = b.getBoundingClientRect();
-    if (r.left < edge - 1 && r.right > edge + 1) cover = Math.max(cover, r.right + 8 - pr.left);
-  }
-  if (cover > g.l && cover < pr.width * 0.75) gl.style.width = Math.ceil(cover) + "px";
+function goPage(i, smooth) {
+  if (!pages.length) buildPages();
+  pageIdx = Math.max(0, Math.min(pages.length - 1, i));
+  const anim = smooth && pref.anim !== 0 && !matchMedia("(prefers-reduced-motion: reduce)").matches;
+  page.scrollTo({ left: pages[pageIdx].s, behavior: anim ? "smooth" : "auto" });
+  if (!anim) applyCover();
 }
+function turn(dir) {
+  if (!pages.length) buildPages();
+  const i = pageAt(page.scrollLeft) + (dir > 0 ? 1 : -1);
+  if (i < 0 || i >= pages.length) return;
+  goPage(i, true);
+}
+// 位置を指定したあと(章を開いた・節へ飛んだ・設定を変えた)、いちばん近いページの区切りにそろえる
+// いまの位置を含むページ(読む順で、その位置の手前から始まるページ)
+function pageFor(t) { let best = -1; pages.forEach((pg, i) => { if (pg.s >= t - 1 && (best < 0 || pg.s < pages[best].s)) best = i; }); return best < 0 ? 0 : best; }
+function alignLine() { if (!cur) return; if (!pages.length) buildPages(); pageIdx = pageFor(page.scrollLeft); if (Math.abs(pages[pageIdx].s - page.scrollLeft) > 1) page.scrollLeft = pages[pageIdx].s; applyCover(); }
 let endTimer;
-page.addEventListener("scroll", () => { clearTimeout(endTimer); document.querySelector(".gut.l").style.width = ""; endTimer = setTimeout(alignLine, 180); }, { passive: true });
+page.addEventListener("scroll", () => { clearTimeout(endTimer); endTimer = setTimeout(() => { pageIdx = pageAt(page.scrollLeft); applyCover(); }, 120); }, { passive: true });
 page.addEventListener("click", e => {
   if (suppressClick) { suppressClick = false; return; }
   if (e.target.closest("button,input,label,summary,a,details")) return;
@@ -2184,28 +2207,35 @@ document.getElementById("prevch").onclick = () => { const i = chapters.indexOf(c
 document.getElementById("nextch").onclick = () => { const i = chapters.indexOf(cur); if (chapters[i + 1]) openChapter(chapters[i + 1].id, null); };
 
 /* ===== 表示の設定 Aa(端末ごとに覚える) ===== */
-let pref = { fs: 0, theme: "", rate: 1, font: "mincho", lh: 1, mx: 1, cpm: 500 };
+let pref = { fs: 0, theme: "", rate: 1, font: "mincho", lh: 1, mx: 1, cpm: 500, anim: 1 };
 try { pref = Object.assign(pref, JSON.parse(localStorage.getItem(LS_PREF) || "{}")); } catch (e) {}
+// 端末の大きさ:スマホ(短い辺が600px未満)/タブレット/大きな画面
+const deviceKind = () => Math.min(innerWidth, innerHeight) < 600 ? "phone" : Math.min(innerWidth, innerHeight) < 1100 ? "tablet" : "desktop";
 function applyPref() {
-  const base = innerWidth >= 1000 && innerHeight >= 700 ? 21 : innerWidth >= 700 ? 20 : 18;
+  const kind = deviceKind();
+  const base = kind === "phone" ? (innerWidth < 360 ? 17 : 18) : kind === "tablet" ? (innerWidth > innerHeight ? 21 : 22) : 21;
+  const fs = base + pref.fs;
   const root = document.documentElement.style;
-  root.setProperty("--fs", (base + pref.fs) + "px");
+  root.setProperty("--fs", fs + "px");
   root.setProperty("--lh", [1.65, 1.85, 2.1][pref.lh]);
-  root.setProperty("--mx", [14, 22, 40][pref.mx] + "px");
+  root.setProperty("--mx", (kind === "phone" ? [12, 20, 32] : [24, 40, 64])[pref.mx] + "px");
+  // 1行(縦の長さ)は新書と同じ42字ほどまで。iPad の縦向きのように画面が縦に長いときは、上下に余白を足して行を短くする
+  root.setProperty("--padY", Math.max(34, Math.round((innerHeight - 42 * fs) / 2)) + "px");
+  root.setProperty("--ui", kind === "phone" ? "13px" : "15px");
   root.setProperty("--bodyfont", pref.font === "gothic" ? "var(--gothic)" : "var(--mincho)");
   if (pref.theme) document.documentElement.setAttribute("data-theme", pref.theme); else document.documentElement.removeAttribute("data-theme");
   document.getElementById("aa-fsv").textContent = (base + pref.fs) + "px";
   const mark = (id, v) => document.querySelectorAll(`#${id} button`).forEach(b => b.classList.toggle("on", b.dataset.v === String(v)));
-  mark("aa-font", pref.font); mark("aa-lh", pref.lh); mark("aa-mx", pref.mx); mark("aa-theme", pref.theme);
+  mark("aa-font", pref.font); mark("aa-lh", pref.lh); mark("aa-mx", pref.mx); mark("aa-theme", pref.theme); mark("aa-anim", pref.anim);
   try { localStorage.setItem(LS_PREF, JSON.stringify(pref)); } catch (e) {}
 }
 // 設定を変えても、読んでいた場所(章の中の割合)を保つ
-function changePref(fn) { const p = cur ? getP() : 0; fn(); applyPref(); if (cur) afterLayout(() => { setP(p); alignLine(); onScroll(); }); }
+function changePref(fn) { const p = cur ? getP() : 0; fn(); applyPref(); if (cur) afterLayout(() => { pages = []; buildPages(); setP(p); alignLine(); onScroll(); }); }
 document.getElementById("aa-fs-").onclick = () => changePref(() => { pref.fs = Math.max(-3, pref.fs - 1); });
 document.getElementById("aa-fs+").onclick = () => changePref(() => { pref.fs = Math.min(8, pref.fs + 1); });
-for (const [id, key, num] of [["aa-font", "font", false], ["aa-lh", "lh", true], ["aa-mx", "mx", true], ["aa-theme", "theme", false]])
+for (const [id, key, num] of [["aa-font", "font", false], ["aa-lh", "lh", true], ["aa-mx", "mx", true], ["aa-theme", "theme", false], ["aa-anim", "anim", true]])
   document.querySelectorAll(`#${id} button`).forEach(b => b.onclick = () => changePref(() => { pref[key] = num ? +b.dataset.v : b.dataset.v; }));
-let rz; window.addEventListener("resize", () => { const p = cur ? getP() : 0; clearTimeout(rz); rz = setTimeout(() => { applyPref(); if (cur) { setP(p); alignLine(); } }, 150); });
+let rz; window.addEventListener("resize", () => { const p = cur ? getP() : 0; clearTimeout(rz); rz = setTimeout(() => { applyPref(); if (cur) afterLayout(() => { pages = []; buildPages(); setP(p); alignLine(); onScroll(); }); }, 150); });
 
 /* ===== 引き出し(Aa・ノート・検索・マーカー編集) ===== */
 function openSheet(id) { document.querySelectorAll(".sheet").forEach(s => s.hidden = s.id !== id); hideSelTool(); }
