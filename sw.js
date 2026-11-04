@@ -1,6 +1,6 @@
 // オフラインでも読めるように、本の中身(1ファイル)とアイコンを端末に保存しておく。
 // 本を更新したら CACHE_NAME の番号を上げる(上げないと古い版が配られ続ける)。
-const CACHE_NAME = "shinsho-keiei2-v2";
+const CACHE_NAME = "shinsho-keiei2-v3";
 const scope = self.registration.scope;
 const FILES = ["", "index.html", "manifest.json", "icon-180.png", "icon-192.png", "icon-512.png"].map(f => new URL(f, scope).href);
 
