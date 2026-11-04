@@ -30,6 +30,14 @@
 :root[data-theme="dark"]{
   --paper:#1b1a18; --ink:#e3e0d6; --ink-soft:#a19d91; --rule:#3a3833;
   --accent:#8fc2ad; --accent-soft:#25302b; --shu:#e48b7c; --box:#22211e; --mark:#4d4321; color-scheme:dark}
+/* 紙の色(Aa の設定で選ぶ)。セピアと緑は明るい紙の仲間 */
+:root[data-theme="sepia"]{
+  --paper:#f3ead6; --ink:#3a2f22; --ink-soft:#7a6a55; --rule:#dccfb4;
+  --accent:#5a6b3f; --accent-soft:#e7e0c8; --shu:#a5492f; --box:#f8f1df; --mark:#efd99a; color-scheme:light}
+:root[data-theme="green"]{
+  --paper:#dfe9dc; --ink:#1f2a22; --ink-soft:#56665a; --rule:#bfd0bf;
+  --accent:#2f5d50; --accent-soft:#cfdfd0; --shu:#a8473a; --box:#e9f0e6; --mark:#efe6a8; color-scheme:light}
+:root{--lh:1.85;--mx:22px;--bodyfont:var(--mincho)}
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
 body{background:var(--paper);color:var(--ink);font-family:var(--mincho);-webkit-text-size-adjust:100%;overflow:hidden;
@@ -76,9 +84,10 @@ button{font:inherit;color:inherit}
 
 /* ===== 読書画面(縦書き) ===== */
 #reader{position:fixed;inset:0;display:flex;flex-direction:column}
-#page{flex:1;min-height:0;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;
-  writing-mode:vertical-rl;font-size:var(--fs);line-height:1.85;
-  padding:calc(env(safe-area-inset-top) + 34px) max(22px,env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 30px) max(22px,env(safe-area-inset-left));
+/* ページは指で払うかタップで1枚ずつめくる(Kindle と同じく、途中で止まる流し読みにはしない)。そのため横のスクロールはさせず、めくりはプログラムで行う */
+#page{flex:1;min-height:0;overflow-x:hidden;overflow-y:hidden;touch-action:pan-y pinch-zoom;
+  writing-mode:vertical-rl;font-size:var(--fs);line-height:var(--lh);font-family:var(--bodyfont);
+  padding:calc(env(safe-area-inset-top) + 34px) max(var(--mx),env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 34px) max(var(--mx),env(safe-area-inset-left));
   text-align:justify;font-feature-settings:"palt" 0;scrollbar-width:none;overscroll-behavior-x:contain}
 #page::-webkit-scrollbar{display:none}
 #page .chapter{display:block}
@@ -159,7 +168,46 @@ body.reading-calm .chrome{opacity:0;pointer-events:none}
 body.reading-calm .chrome.top{transform:translateY(-100%)} body.reading-calm .chrome.bottom{transform:translateY(100%)}
 /* 左右の余白に紙色の帯を重ねて、余白にかかった行を隠す */
 .gut{position:fixed;top:0;bottom:0;z-index:2;pointer-events:none;background:var(--paper)}
-.gut.l{left:0;width:max(22px,env(safe-area-inset-left))} .gut.r{right:0;width:max(22px,env(safe-area-inset-right))}
+.gut.l{left:0;width:max(var(--mx),env(safe-area-inset-left))} .gut.r{right:0;width:max(var(--mx),env(safe-area-inset-right))}
+/* しおりのリボン(右上) */
+.ribbon{position:fixed;top:0;right:calc(max(var(--mx),env(safe-area-inset-right)) + 6px);width:16px;height:calc(env(safe-area-inset-top) + 34px);background:var(--shu);z-index:3;pointer-events:none;
+  clip-path:polygon(0 0,100% 0,100% 100%,50% 82%,0 100%)}
+/* 下の表示(Kindle と同じく、左に章の残り時間、右に本全体の進み) */
+.foot{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 8px);z-index:3;display:flex;justify-content:space-between;
+  padding:0 max(var(--mx),env(safe-area-inset-left));font-family:var(--gothic);font-size:10px;color:var(--ink-soft);pointer-events:none;font-variant-numeric:tabular-nums}
+/* マーカー */
+#page mark.hl{color:inherit;border-radius:2px;background:var(--hl,var(--mark))}
+#page mark.hl.c-y{--hl:color-mix(in srgb,#f2d34b 55%,transparent)} #page mark.hl.c-b{--hl:color-mix(in srgb,#79b8e8 50%,transparent)}
+#page mark.hl.c-p{--hl:color-mix(in srgb,#ef93b4 50%,transparent)} #page mark.hl.c-o{--hl:color-mix(in srgb,#f3a45b 55%,transparent)}
+#page mark.hl.note{box-shadow:inset -2px 0 0 var(--shu)}
+#page mark.find{background:color-mix(in srgb,var(--accent) 35%,transparent);color:inherit}
+/* 文字を選んだときの小さな道具 */
+.seltool{position:fixed;z-index:12;display:flex;gap:4px;align-items:center;background:var(--ink);color:var(--paper);padding:6px;border-radius:8px;font-family:var(--gothic);font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+.seltool button{background:none;border:0;color:inherit;padding:6px 8px;cursor:pointer;min-height:36px}
+.seltool .dot{width:24px;height:24px;border-radius:50%;padding:0;border:2px solid var(--paper)}
+.dot.c-y{background:#f2d34b}.dot.c-b{background:#79b8e8}.dot.c-p{background:#ef93b4}.dot.c-o{background:#f3a45b}
+/* 下から出る引き出し(Aa・ノート・検索) */
+.sheet{position:fixed;inset:0;z-index:11;background:rgba(0,0,0,.28);display:flex;align-items:flex-end;justify-content:center}
+.sheet-body{width:100%;max-width:640px;max-height:82vh;overflow-y:auto;background:var(--box);color:var(--ink);border-radius:14px 14px 0 0;
+  padding:16px max(18px,env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 18px) max(18px,env(safe-area-inset-left));font-family:var(--gothic);font-size:14px;display:flex;flex-direction:column;gap:14px}
+.sheet-h{display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:15px}
+.sheet-h button{background:none;border:1px solid var(--rule);border-radius:16px;padding:4px 12px;cursor:pointer}
+.opt{display:flex;flex-direction:column;gap:6px}
+.opt>span{font-size:12px;color:var(--ink-soft)}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{flex:1 1 0;min-width:56px;border:1px solid var(--rule);background:var(--paper);border-radius:6px;padding:9px 6px;cursor:pointer;font-size:13px}
+.seg button.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);font-weight:700}
+.seg .sw{display:inline-block;width:14px;height:14px;border-radius:50%;vertical-align:-2px;margin-right:4px;border:1px solid var(--rule)}
+.nb-item{border-top:1px solid var(--rule);padding:10px 0;display:flex;flex-direction:column;gap:4px;text-align:left;background:none;border-left:0;border-right:0;border-bottom:0;cursor:pointer;width:100%}
+.nb-item .w{font-size:11px;color:var(--ink-soft)}
+.nb-item .q{font-family:var(--mincho);font-size:15px;line-height:1.6;padding-left:8px;border-left:4px solid var(--hlc,#f2d34b)}
+.nb-item .n{font-size:13px;color:var(--ink);background:var(--paper);padding:6px 8px;border-radius:4px}
+.sheet textarea,.sheet input[type=search]{width:100%;font:inherit;font-size:16px;padding:10px;border:1px solid var(--rule);border-radius:6px;background:var(--paper);color:var(--ink)}
+.sheet textarea{min-height:90px}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap}
+.btnrow button{border:1px solid var(--rule);background:var(--paper);border-radius:6px;padding:9px 14px;cursor:pointer}
+.btnrow button.main{background:var(--accent);border-color:var(--accent);color:var(--paper)}
+.btnrow button.danger{color:var(--shu)}
 .runhead{position:fixed;top:calc(env(safe-area-inset-top) + 8px);left:0;right:0;text-align:center;font-family:var(--gothic);font-size:10px;color:var(--ink-soft);pointer-events:none;letter-spacing:.1em}
 .folio{position:fixed;bottom:calc(env(safe-area-inset-bottom) + 6px);left:0;right:0;text-align:center;font-family:var(--gothic);font-size:10px;color:var(--ink-soft);pointer-events:none;font-variant-numeric:tabular-nums}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 70px);background:var(--ink);color:var(--paper);font-family:var(--gothic);font-size:13px;padding:10px 16px;border-radius:20px;z-index:9;max-width:90vw;display:flex;gap:12px;align-items:center}
@@ -192,6 +240,8 @@ body.reading-calm .chrome.top{transform:translateY(-100%)} body.reading-calm .ch
 body.listening #reader .chrome.bottom{bottom:var(--playerH,0px)}
 body.listening .folio{display:none}
 body.listening #home{padding-bottom:calc(var(--playerH,0px) + 24px)}
+body.listening .foot{display:none}
+.chrome .row button{flex:1 1 auto;padding:6px 4px;font-size:12px;white-space:nowrap}
 @media (max-width:520px){ #page .yoko table{font-size:.8em} #page .yoko th,#page .yoko td{padding:4px 5px} #page .yoko{padding:12px 10px} }
 @media (min-width:700px){ :root{--fs:20px} .cover-title{font-size:44px} }
 @media (min-width:1000px) and (min-height:700px){ :root{--fs:21px} }
@@ -224,9 +274,9 @@ body.listening #home{padding-bottom:calc(var(--playerH,0px) + 24px)}
   </section>
   <div class="sync" id="sync"><span class="led"></span><span id="synctxt">同期の準備中</span></div>
   <div class="tools">
-    <button id="fsminus" aria-label="文字を小さく">文字 小</button>
-    <button id="fsplus" aria-label="文字を大きく">文字 大</button>
-    <button id="theme">表示:端末に合わせる</button>
+    <button id="h-aa">Aa 表示の設定</button>
+    <button id="h-notes">マイノート(マーカーとメモ)</button>
+    <button id="h-search">本の中を検索</button>
   </div>
 </div>
 </div>
@@ -236,16 +286,18 @@ body.listening #home{padding-bottom:calc(var(--playerH,0px) + 24px)}
   <div class="runhead" id="runhead"></div>
   <div id="page" tabindex="0" aria-live="off"></div>
   <div class="gut l" aria-hidden="true"></div><div class="gut r" aria-hidden="true"></div>
-  <div class="folio" id="folio"></div>
+  <div class="foot" id="foot"><span id="ft-left"></span><span id="folio"></span><span id="ft-right"></span></div>
+  <div class="ribbon" id="ribbon" hidden></div>
   <div class="chrome top">
     <button id="back">目次</button>
     <div class="ttl" id="ttl"></div>
-    <button id="listenhere">ここから聞く</button>
-    <button id="markdone">読了にする</button>
+    <button id="r-search" aria-label="本の中を検索">検索</button>
+    <button id="r-aa" aria-label="表示の設定">Aa</button>
+    <button id="r-bm" aria-label="しおり">しおり</button>
   </div>
   <div class="chrome bottom">
     <div class="row"><span id="pct">0%</span><input type="range" id="seek" min="0" max="1000" value="0" aria-label="章の中の位置"><span id="chpos"></span></div>
-    <div class="row"><button id="prevch">前の章</button><button id="rfsminus">文字 小</button><button id="rfsplus">文字 大</button><button id="nextch">次の章</button></div>
+    <div class="row"><button id="prevch">前の章</button><button id="r-notes">ノート</button><button id="listenhere">ここから聞く</button><button id="markdone">読了にする</button><button id="nextch">次の章</button></div>
   </div>
 </div>
 
@@ -267,6 +319,55 @@ body.listening #home{padding-bottom:calc(var(--playerH,0px) + 24px)}
     <button id="pl-close" aria-label="閉じる">×</button>
   </div>
 </div>
+
+<!-- 文字を選んだときの道具 -->
+<div class="seltool" id="seltool" hidden>
+  <button class="dot c-y" data-c="y" aria-label="黄色のマーカー"></button>
+  <button class="dot c-b" data-c="b" aria-label="青のマーカー"></button>
+  <button class="dot c-p" data-c="p" aria-label="ピンクのマーカー"></button>
+  <button class="dot c-o" data-c="o" aria-label="オレンジのマーカー"></button>
+  <button id="st-note">メモ</button>
+  <button id="st-copy">コピー</button>
+</div>
+
+<!-- Aa 表示の設定 -->
+<div class="sheet" id="sh-aa" hidden><div class="sheet-body">
+  <div class="sheet-h"><span>表示の設定</span><button data-close>閉じる</button></div>
+  <div class="opt"><span>文字の大きさ</span><div class="seg"><button id="aa-fs-">あ 小さく</button><button id="aa-fsv" disabled></button><button id="aa-fs+">あ 大きく</button></div></div>
+  <div class="opt"><span>書体</span><div class="seg" id="aa-font"><button data-v="mincho" style="font-family:var(--mincho)">明朝</button><button data-v="gothic" style="font-family:var(--gothic)">ゴシック</button></div></div>
+  <div class="opt"><span>行間</span><div class="seg" id="aa-lh"><button data-v="0">狭め</button><button data-v="1">ふつう</button><button data-v="2">広め</button></div></div>
+  <div class="opt"><span>左右の余白</span><div class="seg" id="aa-mx"><button data-v="0">狭め</button><button data-v="1">ふつう</button><button data-v="2">広め</button></div></div>
+  <div class="opt"><span>紙の色</span><div class="seg" id="aa-theme">
+    <button data-v=""><span class="sw" style="background:linear-gradient(90deg,#f3f2ec 50%,#1b1a18 50%)"></span>端末に合わせる</button>
+    <button data-v="light"><span class="sw" style="background:#f3f2ec"></span>白</button>
+    <button data-v="sepia"><span class="sw" style="background:#f3ead6"></span>セピア</button>
+    <button data-v="green"><span class="sw" style="background:#dfe9dc"></span>緑</button>
+    <button data-v="dark"><span class="sw" style="background:#1b1a18"></span>黒</button>
+  </div></div>
+</div></div>
+
+<!-- マイノート -->
+<div class="sheet" id="sh-nb" hidden><div class="sheet-body">
+  <div class="sheet-h"><span>マイノート</span><button data-close>閉じる</button></div>
+  <div class="seg" id="nb-filter"><button data-v="all" class="on">すべて</button><button data-v="note">メモつき</button><button data-v="bm">しおり</button></div>
+  <div id="nb-list"></div>
+</div></div>
+
+<!-- 本の中を検索 -->
+<div class="sheet" id="sh-search" hidden><div class="sheet-body">
+  <div class="sheet-h"><span>本の中を検索</span><button data-close>閉じる</button></div>
+  <form id="sr-form"><input type="search" id="sr-q" placeholder="言葉を入れる(例:平均回帰)" enterkeyhint="search" autocomplete="off"></form>
+  <div id="sr-list"></div>
+</div></div>
+
+<!-- マーカーとメモの編集 -->
+<div class="sheet" id="sh-hl" hidden><div class="sheet-body">
+  <div class="sheet-h"><span>マーカーとメモ</span><button data-close>閉じる</button></div>
+  <div class="nb-item" style="cursor:default"><span class="q" id="hl-q"></span></div>
+  <div class="opt"><span>色</span><div class="seg" id="hl-color"><button data-v="y"><span class="sw" style="background:#f2d34b"></span>黄</button><button data-v="b"><span class="sw" style="background:#79b8e8"></span>青</button><button data-v="p"><span class="sw" style="background:#ef93b4"></span>ピンク</button><button data-v="o"><span class="sw" style="background:#f3a45b"></span>オレンジ</button></div></div>
+  <div class="opt"><span>メモ</span><textarea id="hl-note" placeholder="気づいたこと、自分の言葉での言い換え、試験で問われそうな点など"></textarea></div>
+  <div class="btnrow"><button class="main" id="hl-save">保存</button><button class="danger" id="hl-del">マーカーを消す</button></div>
+</div></div>
 
 <div id="book" hidden>
 <section class="chapter" id="prologue" data-title="数字は会社の言葉" data-src="この本の読み方">
@@ -1932,6 +2033,8 @@ function openChapter(id, p, secId) {
   if (chapters[idx + 1]) { const nb = document.createElement("button"); nb.className = "next-btn"; nb.textContent = "次の章へ　" + chapters[idx + 1].title; nb.onclick = () => openChapter(chapters[idx + 1].id, 0); tail.append(nb); }
   clone.append(tail);
   tcy(clone);
+  paintHighlights(clone, c.id);
+  lastPage = -1; hideSelTool();
   // 巻末の一覧(タグの付いた箇所)を組み立てる
   const tl = clone.querySelector("#taglist-slot"); if (tl) buildTagList(tl);
   document.getElementById("ttl").textContent = c.title;
@@ -1996,6 +2099,7 @@ function onScroll() {
   const now = Math.min(totalPages, Math.floor(Math.abs(page.scrollLeft) / page.clientWidth) + 1);
   document.getElementById("folio").textContent = `${now} / ${totalPages}`;
   document.getElementById("chpos").textContent = `${chapters.indexOf(cur) + 1} / ${chapters.length}章`;
+  updateFoot(p, now, totalPages);
   savePos(false); markSections();
   if (p > 0.995 && stateOf(cur.id) !== "done") { set("st:" + cur.id, "done"); document.getElementById("markdone").textContent = "読了ずみ"; toast("この章を読み終えました"); }
 }
@@ -2057,8 +2161,13 @@ function hideCutLeft() {
 let endTimer;
 page.addEventListener("scroll", () => { clearTimeout(endTimer); document.querySelector(".gut.l").style.width = ""; endTimer = setTimeout(alignLine, 180); }, { passive: true });
 page.addEventListener("click", e => {
+  if (suppressClick) { suppressClick = false; return; }
   if (e.target.closest("button,input,label,summary,a,details")) return;
   if (getSelection && String(getSelection()).length) return;
+  // マーカーを押したら、色とメモの編集
+  const mk = e.target.closest("mark.hl"); if (mk) { editHighlight(mk.dataset.id); return; }
+  // 右上の角を押したら、しおり(Kindle と同じ場所)
+  if (e.clientX > innerWidth - 60 && e.clientY < 80) { toggleBookmark(); return; }
   const x = e.clientX / innerWidth;
   if (x < 0.3) turn(1); else if (x > 0.7) turn(-1); else document.body.classList.toggle("reading-calm");
 });
@@ -2074,21 +2183,261 @@ document.getElementById("markdone").onclick = () => { if (!cur) return; set("st:
 document.getElementById("prevch").onclick = () => { const i = chapters.indexOf(cur); if (i > 0) openChapter(chapters[i - 1].id, null); };
 document.getElementById("nextch").onclick = () => { const i = chapters.indexOf(cur); if (chapters[i + 1]) openChapter(chapters[i + 1].id, null); };
 
-/* ===== 文字の大きさ・表示(端末ごと) ===== */
-let pref = { fs: 0, theme: "", rate: 1 };
+/* ===== 表示の設定 Aa(端末ごとに覚える) ===== */
+let pref = { fs: 0, theme: "", rate: 1, font: "mincho", lh: 1, mx: 1, cpm: 500 };
 try { pref = Object.assign(pref, JSON.parse(localStorage.getItem(LS_PREF) || "{}")); } catch (e) {}
 function applyPref() {
   const base = innerWidth >= 1000 && innerHeight >= 700 ? 21 : innerWidth >= 700 ? 20 : 18;
-  document.documentElement.style.setProperty("--fs", (base + pref.fs) + "px");
+  const root = document.documentElement.style;
+  root.setProperty("--fs", (base + pref.fs) + "px");
+  root.setProperty("--lh", [1.65, 1.85, 2.1][pref.lh]);
+  root.setProperty("--mx", [14, 22, 40][pref.mx] + "px");
+  root.setProperty("--bodyfont", pref.font === "gothic" ? "var(--gothic)" : "var(--mincho)");
   if (pref.theme) document.documentElement.setAttribute("data-theme", pref.theme); else document.documentElement.removeAttribute("data-theme");
-  document.getElementById("theme").textContent = "表示:" + ({ "": "端末に合わせる", light: "明るい", dark: "暗い" })[pref.theme];
+  document.getElementById("aa-fsv").textContent = (base + pref.fs) + "px";
+  const mark = (id, v) => document.querySelectorAll(`#${id} button`).forEach(b => b.classList.toggle("on", b.dataset.v === String(v)));
+  mark("aa-font", pref.font); mark("aa-lh", pref.lh); mark("aa-mx", pref.mx); mark("aa-theme", pref.theme);
   try { localStorage.setItem(LS_PREF, JSON.stringify(pref)); } catch (e) {}
 }
-function fsChange(d) { const p = cur ? getP() : 0; pref.fs = Math.max(-3, Math.min(6, pref.fs + d)); applyPref(); if (cur) requestAnimationFrame(() => setP(p)); }
-["fsminus", "rfsminus"].forEach(id => document.getElementById(id).onclick = () => fsChange(-1));
-["fsplus", "rfsplus"].forEach(id => document.getElementById(id).onclick = () => fsChange(1));
-document.getElementById("theme").onclick = () => { pref.theme = ({ "": "light", light: "dark", dark: "" })[pref.theme]; applyPref(); };
-let rz; window.addEventListener("resize", () => { const p = cur ? getP() : 0; clearTimeout(rz); rz = setTimeout(() => { applyPref(); if (cur) setP(p); }, 150); });
+// 設定を変えても、読んでいた場所(章の中の割合)を保つ
+function changePref(fn) { const p = cur ? getP() : 0; fn(); applyPref(); if (cur) afterLayout(() => { setP(p); alignLine(); onScroll(); }); }
+document.getElementById("aa-fs-").onclick = () => changePref(() => { pref.fs = Math.max(-3, pref.fs - 1); });
+document.getElementById("aa-fs+").onclick = () => changePref(() => { pref.fs = Math.min(8, pref.fs + 1); });
+for (const [id, key, num] of [["aa-font", "font", false], ["aa-lh", "lh", true], ["aa-mx", "mx", true], ["aa-theme", "theme", false]])
+  document.querySelectorAll(`#${id} button`).forEach(b => b.onclick = () => changePref(() => { pref[key] = num ? +b.dataset.v : b.dataset.v; }));
+let rz; window.addEventListener("resize", () => { const p = cur ? getP() : 0; clearTimeout(rz); rz = setTimeout(() => { applyPref(); if (cur) { setP(p); alignLine(); } }, 150); });
+
+/* ===== 引き出し(Aa・ノート・検索・マーカー編集) ===== */
+function openSheet(id) { document.querySelectorAll(".sheet").forEach(s => s.hidden = s.id !== id); hideSelTool(); }
+function closeSheets() { document.querySelectorAll(".sheet").forEach(s => s.hidden = true); }
+document.querySelectorAll(".sheet").forEach(s => s.addEventListener("click", e => { if (e.target === s || e.target.closest("[data-close]")) closeSheets(); }));
+["h-aa", "r-aa"].forEach(id => document.getElementById(id).onclick = () => openSheet("sh-aa"));
+["h-notes", "r-notes"].forEach(id => document.getElementById(id).onclick = () => { renderNotebook(); openSheet("sh-nb"); });
+["h-search", "r-search"].forEach(id => document.getElementById(id).onclick = () => { openSheet("sh-search"); setTimeout(() => document.getElementById("sr-q").focus(), 50); });
+
+/* ===== めくり:指で払う・トラックパッド・キー ===== */
+let touch0 = null;
+page.addEventListener("touchstart", e => { if (e.touches.length === 1) touch0 = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() }; }, { passive: true });
+page.addEventListener("touchend", e => {
+  if (!touch0) return; const t = e.changedTouches[0]; const dx = t.clientX - touch0.x, dy = t.clientY - touch0.y; const dt = Date.now() - touch0.t; touch0 = null;
+  if (String(getSelection()).length) return;
+  // 縦書きの本は右から左へ進むので、指を右へ払うと次のページ(紙の本をめくる向き)
+  if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.2 && dt < 800) { suppressClick = true; setTimeout(() => { suppressClick = false; }, 400); turn(dx > 0 ? 1 : -1); }
+}, { passive: true });
+let suppressClick = false, wheelAcc = 0, wheelLock = 0;
+page.addEventListener("wheel", e => {
+  e.preventDefault();
+  if (Date.now() < wheelLock) return;
+  wheelAcc += Math.abs(e.deltaX) > Math.abs(e.deltaY) ? -e.deltaX : e.deltaY;
+  if (Math.abs(wheelAcc) > 50) { turn(wheelAcc > 0 ? 1 : -1); wheelAcc = 0; wheelLock = Date.now() + 450; }
+}, { passive: false });
+
+/* ===== 下の表示:章の残り時間(読む速さを覚える)と本全体の進み ===== */
+for (const c of chapters) c.chars = c.el.textContent.replace(/\s+/g, "").length;
+const totalChars = chapters.reduce((a, c) => a + c.chars, 0);
+let lastPage = -1, lastPageAt = 0;
+function updateFoot(p, now, totalPages) {
+  if (!cur) return;
+  // 読む速さ:前のページから今のページまでにかかった時間で、1分あたりの字数を少しずつ学ぶ(3秒〜4分のあいだだけ使う)
+  if (now !== lastPage) {
+    const dt = (Date.now() - lastPageAt) / 1000;
+    if (lastPage >= 0 && now === lastPage + 1 && dt > 3 && dt < 240) {
+      const sample = cur.chars / totalPages / (dt / 60);
+      pref.cpm = Math.round(Math.min(1500, Math.max(150, pref.cpm * 0.85 + sample * 0.15)));
+      try { localStorage.setItem(LS_PREF, JSON.stringify(pref)); } catch (e) {}
+    }
+    lastPage = now; lastPageAt = Date.now();
+  }
+  const leftMin = (1 - p) * cur.chars / pref.cpm;
+  document.getElementById("ft-left").textContent = p > 0.995 ? "この章は読み終わり" : `この章の残り ${leftMin < 1 ? "1分未満" : Math.round(leftMin) + "分"}`;
+  const before = chapters.slice(0, chapters.indexOf(cur)).reduce((a, c) => a + c.chars, 0);
+  document.getElementById("ft-right").textContent = `本の ${Math.floor((before + p * cur.chars) / totalChars * 100)}%`;
+  updateRibbon();
+}
+
+/* ===== マーカーとメモ(Kindle のハイライト) ===== */
+// 記録:「hl:id」= { ch, q(選んだ文字), pre/post(前後の文字), at(章の中の位置), color, note } 消したら { del: 1 }。端末間で同期する
+const live = k => { const v = get(k); return v && !v.del ? v : null; };
+const allOf = prefix => Object.keys(store.items).filter(k => k.startsWith(prefix) && live(k)).map(k => ({ key: k, ...live(k) }));
+// 本文の文字を一続きにして、どの文字がどのテキストノードのどこにあるかを覚える(図・章末のチェック・ボタンは除く)
+function flatText(root) {
+  const nodes = []; let text = "";
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: n => n.parentElement.closest("svg,.tail,.checks,button,.end-h") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+  while (w.nextNode()) { nodes.push({ n: w.currentNode, s: text.length }); text += w.currentNode.nodeValue; }
+  return { text, nodes };
+}
+function offsetOf(ft, node, off) { const it = ft.nodes.find(x => x.n === node); return it ? it.s + off : -1; }
+function wrapRange(ft, s, e, make) {
+  const els = [];
+  for (const { n, s: ns } of ft.nodes.filter(x => x.s < e && x.s + x.n.nodeValue.length > s)) {
+    let node = n; const a = Math.max(0, s - ns), b = Math.min(n.nodeValue.length, e - ns);
+    if (b <= a) continue;
+    if (b < node.nodeValue.length) node.splitText(b);
+    if (a > 0) node = node.splitText(a);
+    const m = make(); node.replaceWith(m); m.append(node); els.push(m);
+  }
+  return els;
+}
+function findAnchor(text, h) {
+  let i = text.indexOf(h.pre + h.q + h.post);
+  if (i >= 0) return i + h.pre.length;
+  i = text.indexOf(h.q + h.post); if (i >= 0) return i;
+  i = text.indexOf(h.pre + h.q); if (i >= 0) return i + h.pre.length;
+  // 同じ言葉が何度も出るときは、覚えておいた位置にいちばん近いもの
+  let best = -1, idx = text.indexOf(h.q);
+  while (idx >= 0) { if (best < 0 || Math.abs(idx - h.at) < Math.abs(best - h.at)) best = idx; idx = text.indexOf(h.q, idx + 1); }
+  return best;
+}
+function paintHighlights(root, chId) {
+  const list = allOf("hl:").filter(h => h.ch === chId);
+  for (const h of list) {
+    const ft = flatText(root); const s = findAnchor(ft.text, h); if (s < 0) continue;
+    wrapRange(ft, s, s + h.q.length, () => { const m = document.createElement("mark"); m.className = `hl c-${h.color || "y"}` + (h.note ? " note" : ""); m.dataset.id = h.key; return m; });
+  }
+}
+
+// 文字を選ぶと、色・メモ・コピーの小さな道具を出す
+const selTool = document.getElementById("seltool");
+let selTimer;
+function hideSelTool() { selTool.hidden = true; }
+document.addEventListener("selectionchange", () => {
+  clearTimeout(selTimer);
+  selTimer = setTimeout(() => {
+    const sel = getSelection();
+    if (!cur || !sel.rangeCount || sel.isCollapsed || !page.contains(sel.anchorNode)) { hideSelTool(); return; }
+    const r = sel.getRangeAt(0).getBoundingClientRect(); if (!r.width && !r.height) { hideSelTool(); return; }
+    selTool.hidden = false;
+    const w = selTool.offsetWidth, h = selTool.offsetHeight;
+    const top = r.top > h + 70 ? r.top - h - 12 : Math.min(innerHeight - h - 70, r.bottom + 12);
+    selTool.style.top = Math.max(8, top) + "px";
+    selTool.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + "px";
+  }, 220);
+});
+function saveSelection(color, withNote) {
+  const sel = getSelection(); if (!cur || !sel.rangeCount || sel.isCollapsed) return null;
+  const rg = sel.getRangeAt(0); const root = page.querySelector(".chapter") || page;
+  const ft = flatText(root);
+  let s = offsetOf(ft, rg.startContainer, rg.startOffset), e = offsetOf(ft, rg.endContainer, rg.endOffset);
+  if (s < 0 || e < 0 || e <= s) { toast("ここはマーカーを引けない場所です"); return null; }
+  const q = ft.text.slice(s, e); if (!q.trim()) return null;
+  const key = "hl:" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const sec = [...root.querySelectorAll("h3[id]")].filter(h => offsetOf(ft, h.firstChild, 0) <= s && offsetOf(ft, h.firstChild, 0) >= 0).pop();
+  set(key, { ch: cur.id, q, pre: ft.text.slice(Math.max(0, s - 24), s), post: ft.text.slice(e, e + 24), at: s, color, note: "", sec: sec ? sec.id : "" });
+  sel.removeAllRanges(); hideSelTool();
+  wrapRange(ft, s, e, () => { const m = document.createElement("mark"); m.className = `hl c-${color}`; m.dataset.id = key; return m; });
+  if (withNote) editHighlight(key);
+  return key;
+}
+selTool.querySelectorAll(".dot").forEach(b => b.onclick = () => saveSelection(b.dataset.c, false));
+document.getElementById("st-note").onclick = () => saveSelection("y", true);
+document.getElementById("st-copy").onclick = async () => {
+  const t = String(getSelection()); try { await navigator.clipboard.writeText(t); toast("コピーしました"); } catch (e) { toast("コピーできませんでした"); }
+  hideSelTool();
+};
+// マーカーの色・メモの編集
+let editing = null;
+function editHighlight(key) {
+  const h = live(key); if (!h) return; editing = key;
+  document.getElementById("hl-q").textContent = h.q;
+  document.getElementById("hl-note").value = h.note || "";
+  document.querySelectorAll("#hl-color button").forEach(b => b.classList.toggle("on", b.dataset.v === (h.color || "y")));
+  openSheet("sh-hl");
+}
+document.querySelectorAll("#hl-color button").forEach(b => b.onclick = () => document.querySelectorAll("#hl-color button").forEach(x => x.classList.toggle("on", x === b)));
+document.getElementById("hl-save").onclick = () => {
+  const h = live(editing); if (!h) return closeSheets();
+  const color = (document.querySelector("#hl-color button.on") || {}).dataset?.v || h.color;
+  set(editing, { ...h, color, note: document.getElementById("hl-note").value.trim() });
+  page.querySelectorAll(`mark.hl[data-id="${CSS.escape(editing)}"]`).forEach(m => { m.className = `hl c-${color}` + (document.getElementById("hl-note").value.trim() ? " note" : ""); });
+  closeSheets(); toast("保存しました");
+  if (!document.getElementById("sh-nb").hidden) renderNotebook();
+};
+document.getElementById("hl-del").onclick = () => {
+  set(editing, { del: 1 });
+  page.querySelectorAll(`mark.hl[data-id="${CSS.escape(editing)}"]`).forEach(m => m.replaceWith(...m.childNodes));
+  closeSheets(); toast("マーカーを消しました");
+};
+
+/* ===== しおり ===== */
+// 記録:「bm:id」= { ch, p(章の中の位置), label }。消したら { del: 1 }
+function pageFrac() { return Math.max(0.001, (page.clientWidth - gutter().l - gutter().r) / maxScroll()); }
+function bookmarkHere() { if (!cur) return null; const p = getP(), f = pageFrac(); return allOf("bm:").find(b => b.ch === cur.id && Math.abs(b.p - p) < f * 0.6) || null; }
+function updateRibbon() { document.getElementById("ribbon").hidden = !bookmarkHere(); const b = document.getElementById("r-bm"); if (b) b.textContent = bookmarkHere() ? "しおりを外す" : "しおり"; }
+function toggleBookmark() {
+  if (!cur) return;
+  const b = bookmarkHere();
+  if (b) { set(b.key, { del: 1 }); toast("しおりを外しました"); }
+  else {
+    // しおりの名前:いま読んでいる節の見出し
+    const pr = page.getBoundingClientRect(); let label = cur.title;
+    page.querySelectorAll("h3[id]").forEach(h => { if (h.getBoundingClientRect().right >= pr.left + 4) label = h.textContent; });
+    set("bm:" + Date.now().toString(36), { ch: cur.id, p: Math.round(getP() * 1000) / 1000, label });
+    toast("しおりをはさみました");
+  }
+  updateRibbon();
+}
+document.getElementById("r-bm").onclick = toggleBookmark;
+
+/* ===== マイノート ===== */
+let nbFilter = "all";
+document.querySelectorAll("#nb-filter button").forEach(b => b.onclick = () => { nbFilter = b.dataset.v; document.querySelectorAll("#nb-filter button").forEach(x => x.classList.toggle("on", x === b)); renderNotebook(); });
+const HLC = { y: "#f2d34b", b: "#79b8e8", p: "#ef93b4", o: "#f3a45b" };
+function renderNotebook() {
+  const box = document.getElementById("nb-list"); box.innerHTML = "";
+  const order = id => chapters.findIndex(c => c.id === id);
+  let items = [...allOf("hl:").map(h => ({ ...h, kind: "hl", pos: h.at })), ...allOf("bm:").map(b => ({ ...b, kind: "bm", pos: b.p * 1e6 }))];
+  if (nbFilter === "note") items = items.filter(i => i.kind === "hl" && i.note);
+  if (nbFilter === "bm") items = items.filter(i => i.kind === "bm");
+  items.sort((a, b) => order(a.ch) - order(b.ch) || a.pos - b.pos);
+  if (!items.length) { box.innerHTML = '<p style="color:var(--ink-soft);font-size:13px;line-height:1.7">まだありません。本文の文字を長押しして選ぶと、マーカーやメモをつけられます。右上の角を押すと、しおりをはさめます。</p>'; return; }
+  for (const it of items) {
+    const c = chOf(it.ch); if (!c) continue;
+    const b = document.createElement("button"); b.className = "nb-item";
+    const w = document.createElement("span"); w.className = "w"; w.textContent = `${c.no}　${c.title}` + (it.kind === "bm" ? `・しおり(${Math.round(it.p * 100)}%)` : ""); b.append(w);
+    const q = document.createElement("span"); q.className = "q"; q.textContent = it.kind === "bm" ? it.label : (it.q.length > 140 ? it.q.slice(0, 140) + "…" : it.q);
+    q.style.setProperty("--hlc", it.kind === "bm" ? "var(--shu)" : HLC[it.color || "y"]); b.append(q);
+    if (it.note) { const n = document.createElement("span"); n.className = "n"; n.textContent = it.note; b.append(n); }
+    b.onclick = () => { closeSheets(); if (it.kind === "bm") openChapter(it.ch, it.p); else jumpToMark(it.ch, it.key); };
+    box.append(b);
+  }
+}
+function jumpToMark(chId, key) {
+  openChapter(chId, null);
+  setTimeout(() => { const m = page.querySelector(`mark.hl[data-id="${CSS.escape(key)}"]`); if (m) { scrollToEl(m); alignLine(); onScroll(); } }, 260);
+}
+
+/* ===== 本の中を検索 ===== */
+document.getElementById("sr-form").addEventListener("submit", e => {
+  e.preventDefault();
+  const q = document.getElementById("sr-q").value.trim(); const box = document.getElementById("sr-list"); box.innerHTML = "";
+  if (!q) return;
+  let n = 0;
+  for (const c of chapters) {
+    const t = flatText(c.el).text; let i = t.indexOf(q), k = 0;
+    while (i >= 0 && n < 120) {
+      const b = document.createElement("button"); b.className = "nb-item";
+      const w = document.createElement("span"); w.className = "w"; w.textContent = `${c.no}　${c.title}`; b.append(w);
+      const s = document.createElement("span"); s.className = "q"; s.style.setProperty("--hlc", "var(--accent)");
+      s.append(t.slice(Math.max(0, i - 30), i).replace(/\s+/g, " "));
+      const em = document.createElement("b"); em.textContent = q; s.append(em, t.slice(i + q.length, i + q.length + 40).replace(/\s+/g, " "));
+      b.append(s);
+      const kk = k; b.onclick = () => { closeSheets(); jumpToFind(c.id, q, kk); };
+      box.append(b); n++; k++; i = t.indexOf(q, i + q.length);
+    }
+  }
+  const head = document.createElement("p"); head.style.cssText = "font-size:12px;color:var(--ink-soft);margin:0";
+  head.textContent = n ? `「${q}」は ${n}${n >= 120 ? "件以上" : "件"}見つかりました` : `「${q}」は見つかりませんでした`;
+  box.prepend(head);
+});
+function jumpToFind(chId, q, k) {
+  openChapter(chId, null);
+  setTimeout(() => {
+    const root = page.querySelector(".chapter") || page; const ft = flatText(root);
+    let i = -1; for (let j = 0; j <= k; j++) { i = ft.text.indexOf(q, i + 1); if (i < 0) return; }
+    const els = wrapRange(ft, i, i + q.length, () => { const m = document.createElement("mark"); m.className = "find"; return m; });
+    if (els[0]) { scrollToEl(els[0]); alignLine(); onScroll(); setTimeout(() => els.forEach(m => m.replaceWith(...m.childNodes)), 6000); }
+  }, 260);
+}
 
 /* ===== 他の端末で先に進んでいたら知らせる ===== */
 function maybeOfferRemote() {
