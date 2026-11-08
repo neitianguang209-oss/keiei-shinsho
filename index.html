@@ -182,6 +182,23 @@ body.reading-calm .chrome.top{transform:translateY(-100%)} body.reading-calm .ch
 #page mark.hl.c-y{--hl:color-mix(in srgb,#f2d34b 55%,transparent)} #page mark.hl.c-b{--hl:color-mix(in srgb,#79b8e8 50%,transparent)}
 #page mark.hl.c-p{--hl:color-mix(in srgb,#ef93b4 50%,transparent)} #page mark.hl.c-o{--hl:color-mix(in srgb,#f3a45b 55%,transparent)}
 #page mark.hl.note{box-shadow:inset -2px 0 0 var(--shu)}
+/* 付箋(振り返り用。マーカーとは別。文字に波線と小さな付箋の印) */
+#page mark.fs{position:relative;background:none;color:inherit;text-decoration:underline wavy var(--fsc);text-decoration-thickness:1.5px;text-underline-offset:.2em;text-underline-position:left;-webkit-text-decoration:underline wavy var(--fsc)}
+/* 行の右の隙間に、紙の付箋のような小さな帯を出す(場所を取らないので、ページ割りは変わらない) */
+#page mark.fs::before{content:"";position:absolute;top:-.1em;right:-.5em;width:.32em;height:1.3em;background:var(--fsc);border-radius:0 2px 2px 0;opacity:.9;pointer-events:none}
+#page mark.fs.done{text-decoration-style:dotted;-webkit-text-decoration-style:dotted} #page mark.fs.done::before{opacity:.3}
+.k-q{--fsc:#d9604c} .k-m{--fsc:#4f8fd1} .k-e{--fsc:#3f9a5a}
+.fs-chip{display:inline-block;font-size:11px;padding:1px 7px;border-radius:2px 2px 6px 6px;color:#fff;background:var(--fsc);flex:none}
+.fs-chip.done{opacity:.45}
+.fs-sum{display:flex;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--ink-soft);align-items:center}
+.fs-card{border:1px solid var(--rule);border-top:6px solid var(--fsc);background:var(--paper);border-radius:4px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.fs-card .w{font-size:11px;color:var(--ink-soft)}
+.fs-card .ctx{font-family:var(--mincho);font-size:16px;line-height:1.9;color:var(--ink-soft)}
+.fs-card .ctx b{color:var(--ink);font-weight:400;text-decoration:underline wavy var(--fsc);text-underline-offset:.3em}
+.fs-card .ctx b.hide{color:transparent;background:repeating-linear-gradient(45deg,color-mix(in srgb,var(--fsc) 22%,transparent) 0 6px,color-mix(in srgb,var(--fsc) 10%,transparent) 6px 12px);border-radius:3px;text-decoration:none}
+.fs-card .ask{font-size:14px;background:var(--box);padding:8px 10px;border-radius:4px;border-left:4px solid var(--fsc)}
+.fs-card .cnt{font-size:11px;color:var(--ink-soft)}
+.tail .fs-btn{font-family:var(--gothic)}
 #page mark.find{background:color-mix(in srgb,var(--accent) 35%,transparent);color:inherit}
 /* 文字を選んだときの小さな道具 */
 .seltool{position:fixed;z-index:12;display:flex;gap:4px;align-items:center;background:var(--ink);color:var(--paper);padding:6px;border-radius:8px;font-family:var(--gothic);font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
@@ -281,6 +298,7 @@ body.listening .foot{display:none}
   </section>
   <div class="sync" id="sync"><span class="led"></span><span id="synctxt">同期の準備中</span></div>
   <div class="tools">
+    <button id="h-review">付箋で振り返る</button>
     <button id="h-aa">Aa 表示の設定</button>
     <button id="h-notes">マイノート(マーカーとメモ)</button>
     <button id="h-search">本の中を検索</button>
@@ -298,13 +316,14 @@ body.listening .foot{display:none}
   <div class="chrome top">
     <button id="back">目次</button>
     <div class="ttl" id="ttl"></div>
+    <button id="r-review" aria-label="付箋で振り返る">付箋</button>
     <button id="r-search" aria-label="本の中を検索">検索</button>
     <button id="r-aa" aria-label="表示の設定">Aa</button>
     <button id="r-bm" aria-label="しおり">しおり</button>
   </div>
   <div class="chrome bottom">
     <div class="row"><span id="pct">0%</span><input type="range" id="seek" min="0" max="1000" value="0" aria-label="章の中の位置"><span id="chpos"></span></div>
-    <div class="row"><button id="prevch">前の章</button><button id="r-notes">ノート</button><button id="listenhere">ここから聞く</button><button id="markdone">読了にする</button><button id="nextch">次の章</button></div>
+    <div class="row"><button id="nextch">← 次の章</button><button id="r-notes">ノート</button><button id="listenhere">ここから聞く</button><button id="markdone">読了にする</button><button id="prevch">前の章 →</button></div>
   </div>
 </div>
 
@@ -333,6 +352,7 @@ body.listening .foot{display:none}
   <button class="dot c-b" data-c="b" aria-label="青のマーカー"></button>
   <button class="dot c-p" data-c="p" aria-label="ピンクのマーカー"></button>
   <button class="dot c-o" data-c="o" aria-label="オレンジのマーカー"></button>
+  <button id="st-fs">付箋</button>
   <button id="st-note">メモ</button>
   <button id="st-copy">コピー</button>
 </div>
@@ -375,6 +395,21 @@ body.listening .foot{display:none}
   <div class="opt"><span>色</span><div class="seg" id="hl-color"><button data-v="y"><span class="sw" style="background:#f2d34b"></span>黄</button><button data-v="b"><span class="sw" style="background:#79b8e8"></span>青</button><button data-v="p"><span class="sw" style="background:#ef93b4"></span>ピンク</button><button data-v="o"><span class="sw" style="background:#f3a45b"></span>オレンジ</button></div></div>
   <div class="opt"><span>メモ</span><textarea id="hl-note" placeholder="気づいたこと、自分の言葉での言い換え、試験で問われそうな点など"></textarea></div>
   <div class="btnrow"><button class="main" id="hl-save">保存</button><button class="danger" id="hl-del">マーカーを消す</button></div>
+</div></div>
+
+<!-- 付箋をはる・直す -->
+<div class="sheet" id="sh-fs" hidden><div class="sheet-body">
+  <div class="sheet-h"><span id="fs-h">付箋をはる</span><button data-close>閉じる</button></div>
+  <div class="nb-item" style="cursor:default"><span class="q" id="fs-q"></span></div>
+  <div class="opt"><span>どんな付箋?</span><div class="seg" id="fs-kind"><button data-v="q" class="k-q"><span class="sw" style="background:var(--fsc)"></span>わからない</button><button data-v="m" class="k-m"><span class="sw" style="background:var(--fsc)"></span>覚える</button><button data-v="e" class="k-e"><span class="sw" style="background:var(--fsc)"></span>試験に出そう</button></div></div>
+  <div class="opt"><span>振り返るときの自分への問い(なくてもよい)</span><textarea id="fs-note" placeholder="例:なぜ利益が出ているのにお金が足りなくなるの? ／ ROEの3つの分け方を言えるか"></textarea></div>
+  <div class="btnrow"><button class="main" id="fs-save">はる</button><button id="fs-done" hidden>わかった</button><button class="danger" id="fs-del" hidden>はがす</button></div>
+</div></div>
+
+<!-- 付箋で振り返る -->
+<div class="sheet" id="sh-rv" hidden><div class="sheet-body">
+  <div class="sheet-h"><span id="rv-h">付箋で振り返る</span><button data-close>閉じる</button></div>
+  <div id="rv-body"></div>
 </div></div>
 
 <div id="book" hidden>
@@ -1991,6 +2026,8 @@ function renderHome() {
   const allEar = Object.keys(EAR), heardAll = allEar.filter(k => get("lis:" + k)).length;
   document.getElementById("alltxt").textContent = `全${chapters.length}章のうち ${doneCount}章を読了(全体の ${Math.round(sum / chapters.length * 100)}%)` + (allEar.length ? `・耳で聞いたのは ${Math.round(heardAll / allEar.length * 100)}%` : "");
   renderListenCard();
+  const fsOpen = Object.keys(store.items).filter(k => k.startsWith("fs:") && get(k) && !get(k).del && !get(k).done).length;
+  document.getElementById("h-review").textContent = fsOpen ? `付箋で振り返る(まだ ${fsOpen}枚)` : "付箋で振り返る";
   const last = get("last"); const btn = document.getElementById("resume");
   const lc = last && chapters.find(c => c.id === last.ch);
   if (lc) {
@@ -2038,10 +2075,14 @@ function openChapter(id, p, secId) {
   db.onclick = () => { set("st:" + c.id, "done"); db.textContent = "読了ずみ"; toast("読了にしました"); };
   tail.append(db);
   const idx = chapters.indexOf(c);
-  if (chapters[idx + 1]) { const nb = document.createElement("button"); nb.className = "next-btn"; nb.textContent = "次の章へ　" + chapters[idx + 1].title; nb.onclick = () => openChapter(chapters[idx + 1].id, 0); tail.append(nb); }
+  // この章の付箋があれば、読み終わりにそのまま振り返れる
+  const nfs = allOf("fs:").filter(f => f.ch === c.id && !f.done).length;
+  if (nfs) { const fb = document.createElement("button"); fb.className = "next-btn fs-btn"; fb.textContent = `この章の付箋を振り返る(${nfs}枚)`; fb.onclick = () => openReview({ ch: c.id, card: true }); tail.append(fb); }
+  if (chapters[idx + 1]) { const nb = document.createElement("button"); nb.className = "next-btn"; nb.textContent = "次の章へ　" + chapters[idx + 1].title + "(このままページをめくっても進めます)"; nb.onclick = () => openChapter(chapters[idx + 1].id, 0); tail.append(nb); }
   clone.append(tail);
   tcy(clone);
   paintHighlights(clone, c.id);
+  paintFusen(clone, c.id);
   lastPage = -1; hideSelTool();
   // 巻末の一覧(タグの付いた箇所)を組み立てる
   const tl = clone.querySelector("#taglist-slot"); if (tl) buildTagList(tl);
@@ -2174,7 +2215,15 @@ function goPage(i, smooth) {
 function turn(dir) {
   if (!pages.length) buildPages();
   const i = pageAt(page.scrollLeft) + (dir > 0 ? 1 : -1);
-  if (i < 0 || i >= pages.length) return;
+  // 章の最後のページでさらにめくると次の章の頭へ、最初のページで戻ると前の章の終わりへ(紙の本と同じく、そのまま続けて読める)
+  if (i >= pages.length || i < 0) {
+    const ci = chapters.indexOf(cur), nx = chapters[ci + (dir > 0 ? 1 : -1)];
+    if (!nx) { toast(dir > 0 ? "この本の最後のページです" : "この本の最初のページです"); return; }
+    if (dir > 0 && stateOf(cur.id) !== "done") set("st:" + cur.id, "done");
+    openChapter(nx.id, dir > 0 ? 0 : 1);
+    toast(dir > 0 ? `${nx.no ? nx.no + "　" : ""}${nx.title}` : `前の章(${nx.no || nx.title})の終わりに戻りました`);
+    return;
+  }
   goPage(i, true);
 }
 // 位置を指定したあと(章を開いた・節へ飛んだ・設定を変えた)、いちばん近いページの区切りにそろえる
@@ -2188,6 +2237,7 @@ page.addEventListener("click", e => {
   if (e.target.closest("button,input,label,summary,a,details")) return;
   if (getSelection && String(getSelection()).length) return;
   // マーカーを押したら、色とメモの編集
+  const fm = e.target.closest("mark.fs"); if (fm) { editFusen(fm.dataset.id); return; }
   const mk = e.target.closest("mark.hl"); if (mk) { editHighlight(mk.dataset.id); return; }
   // 右上の角を押したら、しおり(Kindle と同じ場所)
   if (e.clientX > innerWidth - 60 && e.clientY < 80) { toggleBookmark(); return; }
@@ -2243,6 +2293,7 @@ function closeSheets() { document.querySelectorAll(".sheet").forEach(s => s.hidd
 document.querySelectorAll(".sheet").forEach(s => s.addEventListener("click", e => { if (e.target === s || e.target.closest("[data-close]")) closeSheets(); }));
 ["h-aa", "r-aa"].forEach(id => document.getElementById(id).onclick = () => openSheet("sh-aa"));
 ["h-notes", "r-notes"].forEach(id => document.getElementById(id).onclick = () => { renderNotebook(); openSheet("sh-nb"); });
+["h-review", "r-review"].forEach(id => document.getElementById(id).onclick = () => openReview({}));
 ["h-search", "r-search"].forEach(id => document.getElementById(id).onclick = () => { openSheet("sh-search"); setTimeout(() => document.getElementById("sr-q").focus(), 50); });
 
 /* ===== めくり:指で払う・トラックパッド・キー ===== */
@@ -2407,6 +2458,176 @@ function toggleBookmark() {
   updateRibbon();
 }
 document.getElementById("r-bm").onclick = toggleBookmark;
+
+/* ===== 付箋(あとで振り返るための印。マーカーとは別) =====
+   記録:「fs:id」= { ch, q(選んだ文字), pre/post(前後の文字), at, sec(節), kind, note(自分への問い), done(わかった), n(振り返った回数), rv(最後に振り返った時刻), made }
+   kind:q=わからない/m=覚える/e=試験に出そう。はがしたら { del: 1 }。端末間で同期する */
+const FSK = { q: "わからない", m: "覚える", e: "試験に出そう" };
+const FS_ASK = { q: "ここ、いまなら自分の言葉で説明できる?", m: "本を見ないで言える?", e: "試験で聞かれたら答えられる?" };
+const firstTextOff = (ft, el) => { const t = document.createTreeWalker(el, NodeFilter.SHOW_TEXT).nextNode(); return t ? offsetOf(ft, t, 0) : -1; };
+function selAnchor() {
+  const sel = getSelection(); if (!cur || !sel.rangeCount || sel.isCollapsed) return null;
+  const rg = sel.getRangeAt(0); const root = page.querySelector(".chapter") || page; const ft = flatText(root);
+  const s = offsetOf(ft, rg.startContainer, rg.startOffset), e = offsetOf(ft, rg.endContainer, rg.endOffset);
+  if (s < 0 || e < 0 || e <= s) return null;
+  const q = ft.text.slice(s, e); if (!q.trim()) return null;
+  const sec = [...root.querySelectorAll("h3[id]")].filter(h => { const o = firstTextOff(ft, h); return o >= 0 && o <= s; }).pop();
+  return { s, q, pre: ft.text.slice(Math.max(0, s - 24), s), post: ft.text.slice(e, e + 24), sec: sec ? sec.id : "" };
+}
+function fsMark(key, f) { const m = document.createElement("mark"); m.className = `fs k-${f.kind || "q"}` + (f.done ? " done" : ""); m.dataset.id = key; return m; }
+function paintFusen(root, chId) {
+  for (const f of allOf("fs:").filter(f => f.ch === chId)) {
+    const ft = flatText(root); const s = findAnchor(ft.text, f);
+    if (s >= 0) wrapRange(ft, s, s + f.q.length, () => fsMark(f.key, f));
+  }
+}
+function repaintFs(key) {
+  const f = live(key);
+  page.querySelectorAll(`mark.fs[data-id="${CSS.escape(key)}"]`).forEach(m => { if (!f) m.replaceWith(...m.childNodes); else m.className = fsMark(key, f).className; });
+}
+let fsPending = null, fsEditing = null;
+function showFsSheet(f, existing) {
+  document.getElementById("fs-h").textContent = existing ? `付箋(${FSK[f.kind || "q"]})` : "付箋をはる";
+  document.getElementById("fs-q").textContent = f.q;
+  document.getElementById("fs-note").value = f.note || "";
+  document.querySelectorAll("#fs-kind button").forEach(b => b.classList.toggle("on", b.dataset.v === (f.kind || "q")));
+  document.getElementById("fs-save").textContent = existing ? "保存" : "はる";
+  const d = document.getElementById("fs-done"); d.hidden = !existing; d.textContent = f.done ? "まだ不安(戻す)" : "わかった";
+  document.getElementById("fs-del").hidden = !existing;
+  openSheet("sh-fs");
+}
+function editFusen(key) { const f = live(key); if (!f) return; fsEditing = key; fsPending = null; showFsSheet(f, true); }
+document.getElementById("st-fs").onclick = () => {
+  const a = selAnchor(); if (!a) { toast("ここには付箋をはれません"); return; }
+  fsPending = a; fsEditing = null; getSelection().removeAllRanges(); hideSelTool();
+  showFsSheet({ q: a.q, kind: pref.fsk || "q", note: "" }, false);
+};
+document.querySelectorAll("#fs-kind button").forEach(b => b.onclick = () => document.querySelectorAll("#fs-kind button").forEach(x => x.classList.toggle("on", x === b)));
+const fsKindSel = () => { const b = document.querySelector("#fs-kind button.on"); return b ? b.dataset.v : "q"; };
+const afterFsChange = () => { if (!document.getElementById("home").hidden) renderHome(); };
+document.getElementById("fs-save").onclick = () => {
+  const kind = fsKindSel(), note = document.getElementById("fs-note").value.trim();
+  pref.fsk = kind; try { localStorage.setItem(LS_PREF, JSON.stringify(pref)); } catch (e) {}
+  if (fsPending && cur) {
+    const a = fsPending; fsPending = null;
+    const key = "fs:" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const f = { ch: cur.id, q: a.q, pre: a.pre, post: a.post, at: a.s, sec: a.sec, kind, note, done: false, n: 0, rv: 0, made: Date.now() };
+    set(key, f);
+    const root = page.querySelector(".chapter") || page; const ft = flatText(root); const s = findAnchor(ft.text, f);
+    if (s >= 0) wrapRange(ft, s, s + f.q.length, () => fsMark(key, f));
+    closeSheets(); toast(`「${FSK[kind]}」の付箋をはりました`);
+    return;
+  }
+  const f = live(fsEditing); if (!f) return closeSheets();
+  set(fsEditing, { ...f, kind, note }); repaintFs(fsEditing); closeSheets(); toast("保存しました"); afterFsChange();
+};
+document.getElementById("fs-done").onclick = () => {
+  const f = live(fsEditing); if (!f) return;
+  set(fsEditing, { ...f, kind: fsKindSel(), note: document.getElementById("fs-note").value.trim(), done: !f.done, rv: Date.now() });
+  repaintFs(fsEditing); closeSheets(); afterFsChange();
+  toast(f.done ? "「まだ」に戻しました" : "わかった!付箋は薄くして残しておきます");
+};
+document.getElementById("fs-del").onclick = () => { set(fsEditing, { del: 1 }); repaintFs(fsEditing); closeSheets(); afterFsChange(); toast("付箋をはがしました"); };
+
+// 振り返り:一覧と、1枚ずつめくるカード
+let rv = { ch: "", show: "open", card: false, queue: [], i: 0, ok: 0, again: 0 };
+const bookOrder = id => chapters.findIndex(c => c.id === id);
+function fsScope() { return allOf("fs:").filter(f => chOf(f.ch) && (!rv.ch || f.ch === rv.ch)); }
+function openReview(o) {
+  rv = { ch: o.ch || "", show: "open", card: false, queue: [], i: 0, ok: 0, again: 0 };
+  if (o.card) startCards(); else renderReview();
+  openSheet("sh-rv");
+}
+function startCards() {
+  // まだの付箋を、振り返った回数が少ない順・前に振り返ったのが古い順・本の順に
+  rv.queue = fsScope().filter(f => !f.done).sort((a, b) => (a.n || 0) - (b.n || 0) || (a.rv || 0) - (b.rv || 0) || bookOrder(a.ch) - bookOrder(b.ch) || a.at - b.at).map(f => f.key);
+  rv.card = true; rv.i = 0; rv.ok = 0; rv.again = 0;
+  renderReview();
+}
+function fsContext(f) {
+  // 本文から前後を少し長めに取って、どんな流れの中の言葉だったか思い出せるようにする
+  const c = chOf(f.ch); const t = flatText(c.el).text; const s = findAnchor(t, f);
+  if (s < 0) return { pre: f.pre, q: f.q, post: f.post };
+  return { pre: (s > 70 ? "…" : "") + t.slice(Math.max(0, s - 70), s).replace(/\s+/g, ""), q: f.q, post: t.slice(s + f.q.length, s + f.q.length + 70).replace(/\s+/g, "") + "…" };
+}
+const secTitle = f => { const c = chOf(f.ch); const s = c && c.secs.find(x => x.id === f.sec); return s ? s.title : ""; };
+function segOf(items, val, fn) {
+  const d = document.createElement("div"); d.className = "seg";
+  for (const [v, t] of items) { const b = document.createElement("button"); b.textContent = t; b.classList.toggle("on", v === val); b.onclick = () => fn(v); d.append(b); }
+  return d;
+}
+function renderReview() {
+  const box = document.getElementById("rv-body"); box.innerHTML = "";
+  const head = document.getElementById("rv-h");
+  const scopeName = rv.ch ? `${chOf(rv.ch).no || chOf(rv.ch).title}の付箋` : "付箋で振り返る";
+  if (rv.card) {
+    head.textContent = scopeName;
+    const key = rv.queue[rv.i]; const f = key && live(key);
+    if (!f) {
+      const p = document.createElement("p"); p.style.cssText = "line-height:1.8;margin:0";
+      p.textContent = rv.queue.length ? `${rv.queue.length}枚、振り返りました。わかった ${rv.ok}枚・まだ ${rv.again}枚。` : "まだ振り返る付箋はありません。本文の文字を長押しで選んで「付箋」を押すと、はれます。";
+      const row = document.createElement("div"); row.className = "btnrow";
+      if (rv.again) { const a = document.createElement("button"); a.className = "main"; a.textContent = `「まだ」の${rv.again}枚をもう一周`; a.onclick = startCards; row.append(a); }
+      const l = document.createElement("button"); l.textContent = "一覧を見る"; l.onclick = () => { rv.card = false; renderReview(); }; row.append(l);
+      box.append(p, row); return;
+    }
+    const c = chOf(f.ch), cx = fsContext(f);
+    const card = document.createElement("div"); card.className = `fs-card k-${f.kind || "q"}`;
+    const w = document.createElement("div"); w.className = "w";
+    const chip = document.createElement("span"); chip.className = "fs-chip"; chip.textContent = FSK[f.kind || "q"];
+    w.append(chip, `　${c.no}　${secTitle(f) || c.title}`);
+    const ctx = document.createElement("div"); ctx.className = "ctx"; const b = document.createElement("b"); b.textContent = cx.q; ctx.append(cx.pre, b, cx.post);
+    const ask = document.createElement("div"); ask.className = "ask"; ask.textContent = f.note || FS_ASK[f.kind || "q"];
+    const cnt = document.createElement("div"); cnt.className = "cnt"; cnt.textContent = `${rv.i + 1} / ${rv.queue.length}枚` + (f.n ? `・これまでに ${f.n}回 振り返った` : "・はじめて振り返る");
+    card.append(w, ctx, ask, cnt);
+    const row = document.createElement("div"); row.className = "btnrow";
+    // 「覚える」「試験に出そう」は、選んだ言葉を伏せて出す(思い出してから開く)。「わからない」は伏せずに出す
+    if ((f.kind || "q") !== "q") {
+      b.classList.add("hide"); const sh = document.createElement("button"); sh.textContent = "答えを見る";
+      sh.onclick = () => { b.classList.remove("hide"); sh.remove(); };
+      row.append(sh);
+    }
+    const ok = document.createElement("button"); ok.className = "main"; ok.textContent = "わかった";
+    ok.onclick = () => { set(key, { ...f, done: true, n: (f.n || 0) + 1, rv: Date.now() }); repaintFs(key); afterFsChange(); rv.ok++; rv.i++; renderReview(); };
+    const ag = document.createElement("button"); ag.textContent = "まだ(また出す)";
+    ag.onclick = () => { set(key, { ...f, n: (f.n || 0) + 1, rv: Date.now() }); rv.again++; rv.i++; renderReview(); };
+    const op = document.createElement("button"); op.textContent = "本で確かめる";
+    op.onclick = () => { closeSheets(); jumpToFs(f.ch, key); toast("読み終えたら、上の「付箋」から続きを振り返れます"); };
+    row.append(ok, ag, op); box.append(card, row);
+    return;
+  }
+  head.textContent = scopeName;
+  const all = fsScope();
+  const open = all.filter(f => !f.done), done = all.filter(f => f.done);
+  const sum = document.createElement("div"); sum.className = "fs-sum";
+  for (const k of Object.keys(FSK)) { const n = open.filter(f => (f.kind || "q") === k).length; const s = document.createElement("span"); s.className = `fs-chip k-${k}`; s.textContent = `${FSK[k]} ${n}`; sum.append(s); }
+  sum.append(`わかった ${done.length}枚`);
+  box.append(sum);
+  const scopes = [["", "全部の章"]]; const here = rv.ch || (cur && cur.id); if (here) scopes.push([here, `${chOf(here).no || "この章"}だけ`]);
+  if (scopes.length > 1) box.append(segOf(scopes, rv.ch, v => { rv.ch = v; renderReview(); }));
+  const go = document.createElement("div"); go.className = "btnrow";
+  const st = document.createElement("button"); st.className = "main"; st.textContent = open.length ? `1枚ずつ振り返る(${open.length}枚)` : "振り返る付箋はありません"; st.disabled = !open.length; st.onclick = startCards;
+  go.append(st); box.append(go);
+  box.append(segOf([["open", "まだ"], ["done", "わかった"], ["all", "すべて"]], rv.show, v => { rv.show = v; renderReview(); }));
+  const list = (rv.show === "open" ? open : rv.show === "done" ? done : all).sort((a, b) => bookOrder(a.ch) - bookOrder(b.ch) || a.at - b.at);
+  if (!list.length) { const p = document.createElement("p"); p.style.cssText = "color:var(--ink-soft);font-size:13px;line-height:1.7;margin:0"; p.textContent = all.length ? "ここに出す付箋はありません。" : "まだ付箋はありません。読んでいて「わからない」「覚えたい」「試験に出そう」と思った所の文字を長押しで選び、「付箋」を押すと、はれます。"; box.append(p); return; }
+  for (const f of list) {
+    const c = chOf(f.ch);
+    const b = document.createElement("button"); b.className = `nb-item k-${f.kind || "q"}`;
+    const w = document.createElement("span"); w.className = "w";
+    const chip = document.createElement("span"); chip.className = "fs-chip" + (f.done ? " done" : ""); chip.textContent = f.done ? "わかった" : FSK[f.kind || "q"];
+    w.append(chip, `　${c.no}　${secTitle(f) || c.title}` + (f.n ? `・振り返り${f.n}回` : ""));
+    const q = document.createElement("span"); q.className = "q"; q.style.setProperty("--hlc", "var(--fsc)"); q.textContent = f.q.length > 140 ? f.q.slice(0, 140) + "…" : f.q;
+    b.append(w, q);
+    if (f.note) { const n = document.createElement("span"); n.className = "n"; n.textContent = f.note; b.append(n); }
+    b.onclick = () => { closeSheets(); jumpToFs(f.ch, f.key); };
+    box.append(b);
+  }
+}
+function jumpToFs(chId, key) {
+  if (!cur || cur.id !== chId) openChapter(chId, null);
+  setTimeout(() => { const m = page.querySelector(`mark.fs[data-id="${CSS.escape(key)}"]`); if (m) { scrollToEl(m); alignLine(); onScroll(); } }, 260);
+}
 
 /* ===== マイノート ===== */
 let nbFilter = "all";
