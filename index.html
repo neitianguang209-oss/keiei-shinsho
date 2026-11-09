@@ -204,6 +204,22 @@ body.reading-calm .chrome.top{transform:translateY(-100%)} body.reading-calm .ch
 .seltool{position:fixed;z-index:12;display:flex;gap:4px;align-items:center;background:var(--ink);color:var(--paper);padding:6px;border-radius:8px;font-family:var(--gothic);font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
 .seltool button{background:none;border:0;color:inherit;padding:6px 8px;cursor:pointer;min-height:36px}
 .seltool .dot{width:24px;height:24px;border-radius:50%;padding:0;border:2px solid var(--paper)}
+/* 指で読む端末では、道具を画面の下にまとめて出す(端末のコピーなどの吹き出しと重ならないように) */
+.seltool.dock{top:auto!important;left:50%!important;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 30px);padding:8px 10px;gap:6px;width:max-content;max-width:calc(100vw - 16px)}
+.seltool button{white-space:nowrap;flex:none}
+.seltool .dot{min-height:0;align-self:center}
+.seltool #st-fs{background:var(--shu);color:#fff;border-radius:6px;font-weight:700;padding:6px 12px}
+/* ページ全体の付箋:ページの左上に紙の付箋をはったような印(本文の上には何も描かない) */
+/* 本文の上の余白(行が始まる前)に収まる高さにして、文字には重ねない */
+.pagetab{position:fixed;top:0;left:calc(max(var(--mx),env(safe-area-inset-left)) + 2px);z-index:4;min-width:40px;height:calc(env(safe-area-inset-top) + 28px);border:0;padding:0 8px 5px;cursor:pointer;
+  background:var(--fsc);color:#fff;font-family:var(--gothic);font-size:11px;font-weight:700;line-height:1;display:flex;align-items:flex-end;justify-content:center;border-radius:0 0 4px 4px;box-shadow:0 2px 5px rgba(0,0,0,.2)}
+.pagetab.done{opacity:.4}
+.fs-card .pg{font-family:var(--mincho);font-size:15px;line-height:1.9;max-height:42vh;overflow-y:auto;background:var(--paper);padding:10px 12px;border-radius:4px;white-space:pre-wrap}
+.fs-card .cue{font-family:var(--mincho);font-size:15px;line-height:1.8;color:var(--ink-soft)}
+.menu-pop{position:fixed;z-index:12;display:flex;flex-direction:column;background:var(--box);border:1px solid var(--rule);border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.2);overflow:hidden;font-family:var(--gothic)}
+.menu-pop button{background:none;border:0;border-top:1px solid var(--rule);padding:13px 18px;text-align:left;cursor:pointer;font-size:14px;color:var(--ink)}
+.menu-pop button:first-child{border-top:0}
+.menu-pop small{display:block;font-size:11px;color:var(--ink-soft);margin-top:2px}
 .dot.c-y{background:#f2d34b}.dot.c-b{background:#79b8e8}.dot.c-p{background:#ef93b4}.dot.c-o{background:#f3a45b}
 /* 下から出る引き出し(Aa・ノート・検索) */
 .sheet{position:fixed;inset:0;z-index:11;background:rgba(0,0,0,.28);display:flex;align-items:flex-end;justify-content:center}
@@ -313,10 +329,11 @@ body.listening .foot{display:none}
   <div class="gut l" aria-hidden="true"></div><div class="gut r" aria-hidden="true"></div>
   <div class="foot" id="foot"><span id="ft-left"></span><span id="folio"></span><span id="ft-right"></span></div>
   <div class="ribbon" id="ribbon" hidden></div>
+  <button class="pagetab" id="pagetab" hidden aria-label="このページの付箋">付箋</button>
   <div class="chrome top">
     <button id="back">目次</button>
     <div class="ttl" id="ttl"></div>
-    <button id="r-review" aria-label="付箋で振り返る">付箋</button>
+    <button id="r-review" aria-label="付箋(このページにはる・振り返る)">付箋</button>
     <button id="r-search" aria-label="本の中を検索">検索</button>
     <button id="r-aa" aria-label="表示の設定">Aa</button>
     <button id="r-bm" aria-label="しおり">しおり</button>
@@ -348,11 +365,11 @@ body.listening .foot{display:none}
 
 <!-- 文字を選んだときの道具 -->
 <div class="seltool" id="seltool" hidden>
+  <button id="st-fs">付箋</button>
   <button class="dot c-y" data-c="y" aria-label="黄色のマーカー"></button>
   <button class="dot c-b" data-c="b" aria-label="青のマーカー"></button>
   <button class="dot c-p" data-c="p" aria-label="ピンクのマーカー"></button>
   <button class="dot c-o" data-c="o" aria-label="オレンジのマーカー"></button>
-  <button id="st-fs">付箋</button>
   <button id="st-note">メモ</button>
   <button id="st-copy">コピー</button>
 </div>
@@ -2111,7 +2128,7 @@ function scrollToEl(el) {
   page.scrollLeft += r.right - (pr.right - g.r) + 2;
 }
 function closeReader() {
-  savePos(true); cur = null;
+  savePos(true); cur = null; document.getElementById("pagetab").hidden = true;
   document.getElementById("reader").hidden = true; document.getElementById("home").hidden = false;
   try { history.replaceState(null, "", location.pathname); } catch (e) {}
   renderHome();
@@ -2201,6 +2218,7 @@ function pageAt(sl) { let best = 0; pages.forEach((pg, i) => { if (Math.abs(pg.s
 function applyCover() {
   const gl = document.querySelector(".gut.l"), pg = pages[pageIdx]; gl.style.width = "";
   if (!pg) return;
+  setTimeout(updatePageTab, 0);
   const pr = page.getBoundingClientRect(), g = gutter();
   const x = pg.cut - page.scrollLeft - pr.left; // 隠す境目(画面の x、左端から)
   if (x > g.l && x < pr.width * 0.95) gl.style.width = Math.ceil(x) + "px";
@@ -2293,7 +2311,8 @@ function closeSheets() { document.querySelectorAll(".sheet").forEach(s => s.hidd
 document.querySelectorAll(".sheet").forEach(s => s.addEventListener("click", e => { if (e.target === s || e.target.closest("[data-close]")) closeSheets(); }));
 ["h-aa", "r-aa"].forEach(id => document.getElementById(id).onclick = () => openSheet("sh-aa"));
 ["h-notes", "r-notes"].forEach(id => document.getElementById(id).onclick = () => { renderNotebook(); openSheet("sh-nb"); });
-["h-review", "r-review"].forEach(id => document.getElementById(id).onclick = () => openReview({}));
+document.getElementById("h-review").onclick = () => openReview({});
+document.getElementById("r-review").onclick = e => { e.stopPropagation(); fsMenu(e.currentTarget); };
 ["h-search", "r-search"].forEach(id => document.getElementById(id).onclick = () => { openSheet("sh-search"); setTimeout(() => document.getElementById("sr-q").focus(), 50); });
 
 /* ===== めくり:指で払う・トラックパッド・キー ===== */
@@ -2348,6 +2367,14 @@ function flatText(root) {
   return { text, nodes };
 }
 function offsetOf(ft, node, off) { const it = ft.nodes.find(x => x.n === node); return it ? it.s + off : -1; }
+// 選んだ範囲の端が文字の中でないとき(段落のすき間・図・見出しの端など)でも、いちばん近い本文の文字の位置に寄せる
+function edgeOff(ft, node, off, isEnd) {
+  const d = offsetOf(ft, node, off); if (d >= 0) return d;
+  const bp = document.createRange(); try { bp.setStart(node, off); } catch (e) { return -1; }
+  if (!isEnd) { for (const x of ft.nodes) if (bp.comparePoint(x.n, 0) >= 0) return x.s; return -1; }
+  for (let i = ft.nodes.length - 1; i >= 0; i--) { const x = ft.nodes[i]; if (bp.comparePoint(x.n, x.n.nodeValue.length) <= 0) return x.s + x.n.nodeValue.length; }
+  return -1;
+}
 function wrapRange(ft, s, e, make) {
   const els = [];
   for (const { n, s: ns } of ft.nodes.filter(x => x.s < e && x.s + x.n.nodeValue.length > s)) {
@@ -2379,15 +2406,22 @@ function paintHighlights(root, chId) {
 
 // 文字を選ぶと、色・メモ・コピーの小さな道具を出す
 const selTool = document.getElementById("seltool");
-let selTimer;
+let selTimer, selSnap = null;
+// 道具を押しても、選んだ文字が外れないように(パソコン)
+selTool.addEventListener("mousedown", e => e.preventDefault());
 function hideSelTool() { selTool.hidden = true; }
 document.addEventListener("selectionchange", () => {
   clearTimeout(selTimer);
   selTimer = setTimeout(() => {
     const sel = getSelection();
-    if (!cur || !sel.rangeCount || sel.isCollapsed || !page.contains(sel.anchorNode)) { hideSelTool(); return; }
-    const r = sel.getRangeAt(0).getBoundingClientRect(); if (!r.width && !r.height) { hideSelTool(); return; }
+    if (!cur || !sel.rangeCount || sel.isCollapsed || !page.contains(sel.anchorNode)) { hideSelTool(); selSnap = null; return; }
+    const r = sel.getRangeAt(0).getBoundingClientRect(); if (!r.width && !r.height) { hideSelTool(); selSnap = null; return; }
+    // いま選んでいる範囲を覚えておく(道具を押した瞬間に端末が選択を外しても、付箋やマーカーをつけられるように)
+    selSnap = selAnchor();
     selTool.hidden = false;
+    const dock = matchMedia("(pointer: coarse)").matches;
+    selTool.classList.toggle("dock", dock);
+    if (dock) return;
     const w = selTool.offsetWidth, h = selTool.offsetHeight;
     const top = r.top > h + 70 ? r.top - h - 12 : Math.min(innerHeight - h - 70, r.bottom + 12);
     selTool.style.top = Math.max(8, top) + "px";
@@ -2395,16 +2429,12 @@ document.addEventListener("selectionchange", () => {
   }, 220);
 });
 function saveSelection(color, withNote) {
-  const sel = getSelection(); if (!cur || !sel.rangeCount || sel.isCollapsed) return null;
-  const rg = sel.getRangeAt(0); const root = page.querySelector(".chapter") || page;
-  const ft = flatText(root);
-  let s = offsetOf(ft, rg.startContainer, rg.startOffset), e = offsetOf(ft, rg.endContainer, rg.endOffset);
-  if (s < 0 || e < 0 || e <= s) { toast("ここはマーカーを引けない場所です"); return null; }
-  const q = ft.text.slice(s, e); if (!q.trim()) return null;
+  const a = curSel(); if (!a) { toast("マーカーを引く文字を、もう一度選んでください"); return null; }
+  const root = page.querySelector(".chapter") || page; const ft = flatText(root);
+  const s = a.s, e = a.s + a.q.length;
   const key = "hl:" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-  const sec = [...root.querySelectorAll("h3[id]")].filter(h => offsetOf(ft, h.firstChild, 0) <= s && offsetOf(ft, h.firstChild, 0) >= 0).pop();
-  set(key, { ch: cur.id, q, pre: ft.text.slice(Math.max(0, s - 24), s), post: ft.text.slice(e, e + 24), at: s, color, note: "", sec: sec ? sec.id : "" });
-  sel.removeAllRanges(); hideSelTool();
+  set(key, { ch: cur.id, q: a.q, pre: a.pre, post: a.post, at: s, color, note: "", sec: a.sec });
+  getSelection().removeAllRanges(); selSnap = null; hideSelTool();
   wrapRange(ft, s, e, () => { const m = document.createElement("mark"); m.className = `hl c-${color}`; m.dataset.id = key; return m; });
   if (withNote) editHighlight(key);
   return key;
@@ -2464,19 +2494,152 @@ document.getElementById("r-bm").onclick = toggleBookmark;
    kind:q=わからない/m=覚える/e=試験に出そう。はがしたら { del: 1 }。端末間で同期する */
 const FSK = { q: "わからない", m: "覚える", e: "試験に出そう" };
 const FS_ASK = { q: "ここ、いまなら自分の言葉で説明できる?", m: "本を見ないで言える?", e: "試験で聞かれたら答えられる?" };
+const FS_ASK_PG = { q: "このページに書いてあったこと、いまなら説明できる?", m: "このページの要点を、本を見ないで言える?", e: "このページから出題されたら答えられる?" };
 const firstTextOff = (ft, el) => { const t = document.createTreeWalker(el, NodeFilter.SHOW_TEXT).nextNode(); return t ? offsetOf(ft, t, 0) : -1; };
 function selAnchor() {
   const sel = getSelection(); if (!cur || !sel.rangeCount || sel.isCollapsed) return null;
   const rg = sel.getRangeAt(0); const root = page.querySelector(".chapter") || page; const ft = flatText(root);
-  const s = offsetOf(ft, rg.startContainer, rg.startOffset), e = offsetOf(ft, rg.endContainer, rg.endOffset);
-  if (s < 0 || e < 0 || e <= s) return null;
-  const q = ft.text.slice(s, e); if (!q.trim()) return null;
+  const s = edgeOff(ft, rg.startContainer, rg.startOffset, false), e = edgeOff(ft, rg.endContainer, rg.endOffset, true);
+  return anchorOf(root, ft, s, e);
+}
+function anchorOf(root, ft, s, e) {
+  // 前後の空白は落とす(段落の切れ目までかかっても、文字だけを記録する)
+  while (s < e && /\s/.test(ft.text[s])) s++;
+  while (e > s && /\s/.test(ft.text[e - 1])) e--;
+  if (s < 0 || e <= s) return null;
+  const q = ft.text.slice(s, e);
   const sec = [...root.querySelectorAll("h3[id]")].filter(h => { const o = firstTextOff(ft, h); return o >= 0 && o <= s; }).pop();
   return { s, q, pre: ft.text.slice(Math.max(0, s - 24), s), post: ft.text.slice(e, e + 24), sec: sec ? sec.id : "" };
 }
+// いま選んでいる範囲(端末が選択を外してしまっていたら、直前に覚えた範囲)
+const curSel = () => selAnchor() || selSnap;
+
+/* ===== 長押しで「用語」ごと選ぶ =====
+   本の言葉(章末のキーワード・本文の太字)に当たればその言葉全体を、なければ漢字・カタカナ・英数字のひと続きを選ぶ。
+   ひらがなの所は、端末の日本語の区切り(Intl.Segmenter)で1語を選ぶ。図を長押ししたら図の説明文を選ぶ */
+let TERMS = null;
+function termList() {
+  if (TERMS) return TERMS;
+  const set = new Set();
+  const add = t => { t = (t || "").replace(/\s+/g, ""); if (t.length >= 2 && t.length <= 30) set.add(t); };
+  for (const c of chapters) {
+    c.el.querySelectorAll(".kw").forEach(k => k.textContent.split(/[／\/]/).forEach(t => { add(t); add(t.replace(/[(（][^)）]*[)）]/g, "")); }));
+    // 太字は、用語らしい短いものだけ(文になっている強調は除く)
+    c.el.querySelectorAll("b").forEach(b => { const t = b.textContent.replace(/\s+/g, ""); if (t.length <= 14 && !/[、。，,「」!?！？]/.test(t)) add(t); });
+  }
+  TERMS = [...set].sort((a, b) => b.length - a.length);
+  return TERMS;
+}
+const RUN_CH = /[\p{Script=Han}々〆ヶ\p{Script=Katakana}ーｰA-Za-z0-9Ａ-Ｚａ-ｚ０-９]/u;
+function inRun(t, i) {
+  const c = t[i]; if (!c) return false;
+  if (RUN_CH.test(c)) return true;
+  // 「・」はカタカナどうしをつなぐときだけ(インタレスト・カバレッジ)。小数点は数字どうしのときだけ
+  if (c === "・") return /\p{Script=Katakana}/u.test(t[i - 1] || "") && /\p{Script=Katakana}/u.test(t[i + 1] || "");
+  if (c === "." || c === "．") return /[0-9０-９]/.test(t[i - 1] || "") && /[0-9０-９]/.test(t[i + 1] || "");
+  return false;
+}
+function termAt(text, o) {
+  const c = text[o];
+  if (!c || /[\s、。，,．.「」『』()（）〔〕【】［］！？!?：:；;…―—〜～]/.test(c)) return null;
+  for (const t of termList()) {
+    const i = text.indexOf(t, Math.max(0, o - t.length + 1));
+    if (i >= 0 && i <= o) return [i, i + t.length];
+  }
+  let s = o, e = o + 1;
+  if (inRun(text, o)) {
+    while (s > 0 && inRun(text, s - 1) && o - s < 30) s--;
+    while (inRun(text, e) && e - o < 30) e++;
+    if (e - s >= 2) return [s, e];
+  }
+  // 1文字だけ・ひらがなの所:日本語の区切りで1語
+  if (typeof Intl !== "undefined" && Intl.Segmenter) {
+    const from = Math.max(0, o - 24), win = text.slice(from, o + 24);
+    for (const sg of new Intl.Segmenter("ja", { granularity: "word" }).segment(win)) {
+      const a = from + sg.index, b = a + sg.segment.length;
+      if (a <= o && o < b && sg.segment.trim()) return [a, b];
+    }
+  }
+  return [s, e];
+}
+function caretAt(x, y) {
+  if (document.caretRangeFromPoint) { const r = document.caretRangeFromPoint(x, y); return r ? { n: r.startContainer, o: r.startOffset } : null; }
+  if (document.caretPositionFromPoint) { const p = document.caretPositionFromPoint(x, y); return p ? { n: p.offsetNode, o: p.offset } : null; }
+  return null;
+}
+// 本文の通し番号 off の文字が、どのテキストのどこにあるか
+function pointOf(ft, off, isEnd) {
+  for (const x of ft.nodes) { const L = x.n.nodeValue.length; if (off < x.s + L || (isEnd && off === x.s + L)) return { n: x.n, o: Math.max(0, off - x.s) }; }
+  const last = ft.nodes[ft.nodes.length - 1]; return last ? { n: last.n, o: last.n.nodeValue.length } : null;
+}
+function charRect(ft, k) {
+  const p = pointOf(ft, k, false); if (!p || p.o >= p.n.nodeValue.length) return null;
+  const r = document.createRange(); r.setStart(p.n, p.o); r.setEnd(p.n, p.o + 1);
+  const b = r.getBoundingClientRect(); return b.width || b.height ? b : null;
+}
+function selectFlat(ft, s, e) {
+  const a = pointOf(ft, s, false), b = pointOf(ft, e, true); if (!a || !b) return false;
+  const sel = getSelection();
+  try { sel.setBaseAndExtent(a.n, a.o, b.n, b.o); } catch (err) { const r = document.createRange(); r.setStart(a.n, a.o); r.setEnd(b.n, b.o); sel.removeAllRanges(); sel.addRange(r); }
+  return true;
+}
+// 指(またはマウス)を置いた所の用語の範囲 [s, e]
+function termRangeAt(x, y, target) {
+  if (!cur) return null;
+  const root = page.querySelector(".chapter") || page, ft = flatText(root);
+  const fig = target && target.closest && target.closest("figure");
+  if (fig) {
+    const cap = fig.querySelector("figcaption"); if (!cap) return null;
+    const s = firstTextOff(ft, cap); if (s < 0) return null;
+    return { ft, s, e: s + cap.textContent.length };
+  }
+  const c = caretAt(x, y); if (!c || c.n.nodeType !== 3) return null;
+  let o = offsetOf(ft, c.n, c.o); if (o < 0) return null;
+  // 置いた点は文字と文字の境目で返るので、指が乗っている文字(前か後ろ)を確かめる
+  const hit = k => { const b = charRect(ft, k); return b && x >= b.left - 2 && x <= b.right + 2 && y >= b.top - 2 && y <= b.bottom + 2; };
+  if (!hit(o) && o > 0 && hit(o - 1)) o--;
+  const r = termAt(ft.text, Math.min(o, ft.text.length - 1)); if (!r) return null;
+  return { ft, s: r[0], e: r[1] };
+}
+let lp = null; // 長押し中:{ x, y, target, timer, down, sel:[s,e], until }
+function startLp(x, y, target) {
+  clearTimeout(lp && lp.timer);
+  if (!cur || target.closest("button,input,label,summary,a")) { lp = null; return; }
+  lp = { x, y, target, down: true, sel: null, until: 0 };
+  lp.timer = setTimeout(() => {
+    if (!lp || !lp.down) return;
+    const r = termRangeAt(lp.x, lp.y, lp.target); if (!r) return;
+    lp.sel = [r.s, r.e];
+    selectFlat(r.ft, r.s, r.e);
+    if (navigator.vibrate) try { navigator.vibrate(8); } catch (e) {}
+  }, 430);
+}
+function moveLp(x, y) { if (lp && Math.hypot(x - lp.x, y - lp.y) > 10) { clearTimeout(lp.timer); lp.sel = null; } }
+function endLp() { if (!lp) return; clearTimeout(lp.timer); lp.down = false; lp.until = Date.now() + 700; }
+page.addEventListener("touchstart", e => { if (e.touches.length === 1) startLp(e.touches[0].clientX, e.touches[0].clientY, e.target); else if (lp) { clearTimeout(lp.timer); lp = null; } }, { passive: true });
+page.addEventListener("touchmove", e => { if (e.touches.length === 1) moveLp(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
+page.addEventListener("touchend", endLp, { passive: true });
+page.addEventListener("touchcancel", endLp, { passive: true });
+page.addEventListener("pointerdown", e => { if (e.pointerType === "mouse" && e.button === 0) startLp(e.clientX, e.clientY, e.target); });
+page.addEventListener("pointermove", e => { if (e.pointerType === "mouse") moveLp(e.clientX, e.clientY); });
+page.addEventListener("pointerup", e => { if (e.pointerType === "mouse") endLp(); });
+// 長押しの直後に端末が自分の区切りで選び直したら、用語の範囲に戻す(そのあと指で端を動かして直すのは自由)
+document.addEventListener("selectionchange", () => {
+  if (!lp || !lp.sel || !(lp.down || Date.now() < lp.until)) return;
+  const root = page.querySelector(".chapter") || page, ft = flatText(root), sel = getSelection();
+  if (sel.rangeCount && !sel.isCollapsed) {
+    const rg = sel.getRangeAt(0);
+    if (edgeOff(ft, rg.startContainer, rg.startOffset, false) === lp.sel[0] && edgeOff(ft, rg.endContainer, rg.endOffset, true) === lp.sel[1]) return;
+  }
+  selectFlat(ft, lp.sel[0], lp.sel[1]);
+});
+// 長押しで出る端末のメニュー(Android の右クリック相当)は出さない。代わりに下の道具を使う
+page.addEventListener("contextmenu", e => { if (lp && lp.sel) e.preventDefault(); });
+
 function fsMark(key, f) { const m = document.createElement("mark"); m.className = `fs k-${f.kind || "q"}` + (f.done ? " done" : ""); m.dataset.id = key; return m; }
 function paintFusen(root, chId) {
-  for (const f of allOf("fs:").filter(f => f.ch === chId)) {
+  pageFsCache = null;
+  for (const f of allOf("fs:").filter(f => f.ch === chId && !f.pg)) {
     const ft = flatText(root); const s = findAnchor(ft.text, f);
     if (s >= 0) wrapRange(ft, s, s + f.q.length, () => fsMark(f.key, f));
   }
@@ -2484,11 +2647,71 @@ function paintFusen(root, chId) {
 function repaintFs(key) {
   const f = live(key);
   page.querySelectorAll(`mark.fs[data-id="${CSS.escape(key)}"]`).forEach(m => { if (!f) m.replaceWith(...m.childNodes); else m.className = fsMark(key, f).className; });
+  pageFsCache = null; updatePageTab();
 }
+
+/* ===== ページ全体の付箋 =====
+   記録は言葉の付箋と同じ「fs:id」で、pg:1 と、そのページに見えていた本文(q)を持つ。
+   文字の大きさを変えるとページの切れ目は変わるので、「そのページの文章」として覚え、いま見ているページと重なれば印を出す */
+let pageFsCache = null;
+// いま見えているページの本文の範囲 [s, e)(縦書きは読む順に x が小さくなるので、二分探索で端を探す)
+function pageTextRange() {
+  if (!cur) return null; if (!pages.length) buildPages();
+  const root = page.querySelector(".chapter") || page, ft = flatText(root), n = ft.text.length; if (!n) return null;
+  const pr = page.getBoundingClientRect(), g = gutter(), pg = pages[pageAt(page.scrollLeft)];
+  const visR = pr.right - g.r + 1, visL = Math.max(pr.left + g.l, pg ? pg.cut - page.scrollLeft : -1e9) - 1;
+  const xOf = k => { for (let d = 0; d < 12 && k + d < n; d++) { const b = charRect(ft, k + d); if (b) return (b.left + b.right) / 2; } return -1e9; };
+  const firstLeftOf = lim => { let lo = 0, hi = n; while (lo < hi) { const mid = (lo + hi) >> 1; if (xOf(mid) < lim) hi = mid; else lo = mid + 1; } return lo; };
+  const s = firstLeftOf(visR), e = firstLeftOf(visL);
+  return e > s ? { root, ft, s, e } : null;
+}
+function pageFsHere() {
+  if (!cur) return [];
+  const root = page.querySelector(".chapter") || page;
+  if (!pageFsCache) { const t = flatText(root).text; pageFsCache = allOf("fs:").filter(f => f.ch === cur.id && f.pg).map(f => ({ f, s: findAnchor(t, f) })).filter(x => x.s >= 0); }
+  if (!pageFsCache.length) return [];
+  const r = pageTextRange(); if (!r) return [];
+  // そのページに付箋の文章の頭がある、またはページの4割以上が付箋の文章と重なる
+  return pageFsCache.filter(({ f, s }) => { const e = s + f.q.length, ov = Math.min(e, r.e) - Math.max(s, r.s); return ov > 0 && ((s >= r.s && s < r.e) || ov > (r.e - r.s) * 0.4); }).map(x => x.f);
+}
+function updatePageTab() {
+  const tab = document.getElementById("pagetab"); if (!tab) return;
+  const here = cur ? pageFsHere() : [];
+  tab.hidden = !here.length; if (!here.length) return;
+  const f = here.find(x => !x.done) || here[0];
+  tab.className = `pagetab k-${f.kind || "q"}` + (f.done ? " done" : "");
+  tab.textContent = here.length > 1 ? `付箋${here.length}` : "付箋";
+  tab.onclick = () => editFusen(f.key);
+}
+function pinPage() {
+  const r = pageTextRange(); const a = r && anchorOf(r.root, r.ft, r.s, r.e);
+  if (!a) { toast("このページには付箋をはれません"); return; }
+  const dup = pageFsHere()[0]; if (dup) { editFusen(dup.key); toast("このページにはもう付箋があります"); return; }
+  // そのページにある節の見出し(振り返るときの手がかりにする)
+  const hd = [...r.root.querySelectorAll("h3[id]")].filter(h => { const o = firstTextOff(r.ft, h); return o >= r.s && o < r.e; }).map(h => h.textContent.trim());
+  fsPending = { ...a, pg: 1, hd }; fsEditing = null; hideSelTool();
+  showFsSheet({ q: a.q, pg: 1, sec: a.sec, ch: cur.id, kind: pref.fsk || "q", note: "" }, false);
+}
+const pagePreview = f => { const t = f.q.replace(/\s+/g, ""); return `このページ全体(約${t.length}字)\n${t.slice(0, 60)}…`; };
+// 付箋ボタン(読書中の上の帯):このページにはる/振り返る
+function fsMenu(btn) {
+  document.querySelectorAll(".menu-pop").forEach(m => m.remove());
+  const m = document.createElement("div"); m.className = "menu-pop";
+  const open = allOf("fs:").filter(f => !f.done).length, here = cur ? allOf("fs:").filter(f => f.ch === cur.id && !f.done).length : 0;
+  const a = document.createElement("button"); a.innerHTML = "このページに付箋をはる<small>ページ全体をあとで振り返る</small>"; a.onclick = () => { m.remove(); pinPage(); };
+  const b = document.createElement("button"); b.innerHTML = "付箋で振り返る<small></small>"; b.querySelector("small").textContent = open ? `まだ ${open}枚` + (here ? `(この章 ${here}枚)` : "") : "まだ付箋はありません"; b.onclick = () => { m.remove(); openReview({}); };
+  const tip = document.createElement("button"); tip.disabled = true; tip.style.cssText = "font-size:12px;color:var(--ink-soft);cursor:default"; tip.textContent = "言葉にはるときは、本文を長押し";
+  m.append(a, b, tip); document.body.append(m);
+  const r = btn.getBoundingClientRect();
+  m.style.top = (r.bottom + 6) + "px"; m.style.left = Math.max(8, Math.min(innerWidth - m.offsetWidth - 8, r.right - m.offsetWidth)) + "px";
+  setTimeout(() => document.addEventListener("click", function off(e) { if (!m.contains(e.target)) { m.remove(); document.removeEventListener("click", off, true); } }, true), 0);
+}
+
 let fsPending = null, fsEditing = null;
 function showFsSheet(f, existing) {
-  document.getElementById("fs-h").textContent = existing ? `付箋(${FSK[f.kind || "q"]})` : "付箋をはる";
-  document.getElementById("fs-q").textContent = f.q;
+  document.getElementById("fs-h").textContent = f.pg ? (existing ? `ページの付箋(${FSK[f.kind || "q"]})` : "このページに付箋をはる") : existing ? `付箋(${FSK[f.kind || "q"]})` : "付箋をはる";
+  document.getElementById("fs-q").textContent = f.pg ? pagePreview(f) : f.q;
+  document.getElementById("fs-q").style.whiteSpace = f.pg ? "pre-wrap" : "";
   document.getElementById("fs-note").value = f.note || "";
   document.querySelectorAll("#fs-kind button").forEach(b => b.classList.toggle("on", b.dataset.v === (f.kind || "q")));
   document.getElementById("fs-save").textContent = existing ? "保存" : "はる";
@@ -2498,8 +2721,8 @@ function showFsSheet(f, existing) {
 }
 function editFusen(key) { const f = live(key); if (!f) return; fsEditing = key; fsPending = null; showFsSheet(f, true); }
 document.getElementById("st-fs").onclick = () => {
-  const a = selAnchor(); if (!a) { toast("ここには付箋をはれません"); return; }
-  fsPending = a; fsEditing = null; getSelection().removeAllRanges(); hideSelTool();
+  const a = curSel(); if (!a) { toast("付箋をはる文字を、もう一度長押しで選んでください"); return; }
+  fsPending = a; fsEditing = null; getSelection().removeAllRanges(); selSnap = null; hideSelTool();
   showFsSheet({ q: a.q, kind: pref.fsk || "q", note: "" }, false);
 };
 document.querySelectorAll("#fs-kind button").forEach(b => b.onclick = () => document.querySelectorAll("#fs-kind button").forEach(x => x.classList.toggle("on", x === b)));
@@ -2512,10 +2735,11 @@ document.getElementById("fs-save").onclick = () => {
     const a = fsPending; fsPending = null;
     const key = "fs:" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     const f = { ch: cur.id, q: a.q, pre: a.pre, post: a.post, at: a.s, sec: a.sec, kind, note, done: false, n: 0, rv: 0, made: Date.now() };
+    if (a.pg) { f.pg = 1; if (a.hd && a.hd.length) f.hd = a.hd; }
     set(key, f);
-    const root = page.querySelector(".chapter") || page; const ft = flatText(root); const s = findAnchor(ft.text, f);
-    if (s >= 0) wrapRange(ft, s, s + f.q.length, () => fsMark(key, f));
-    closeSheets(); toast(`「${FSK[kind]}」の付箋をはりました`);
+    if (!f.pg) { const root = page.querySelector(".chapter") || page; const ft = flatText(root); const s = findAnchor(ft.text, f); if (s >= 0) wrapRange(ft, s, s + f.q.length, () => fsMark(key, f)); }
+    pageFsCache = null; updatePageTab();
+    closeSheets(); toast(f.pg ? `このページに「${FSK[kind]}」の付箋をはりました` : `「${FSK[kind]}」の付箋をはりました`);
     return;
   }
   const f = live(fsEditing); if (!f) return closeSheets();
@@ -2565,34 +2789,50 @@ function renderReview() {
     const key = rv.queue[rv.i]; const f = key && live(key);
     if (!f) {
       const p = document.createElement("p"); p.style.cssText = "line-height:1.8;margin:0";
-      p.textContent = rv.queue.length ? `${rv.queue.length}枚、振り返りました。わかった ${rv.ok}枚・まだ ${rv.again}枚。` : "まだ振り返る付箋はありません。本文の文字を長押しで選んで「付箋」を押すと、はれます。";
+      p.textContent = rv.queue.length ? `${rv.queue.length}枚、振り返りました。わかった ${rv.ok}枚・まだ ${rv.again}枚。` : "まだ振り返る付箋はありません。本文の言葉を長押しして「付箋」を押すか、読書中に上の「付箋」→「このページに付箋をはる」で、はれます。";
       const row = document.createElement("div"); row.className = "btnrow";
       if (rv.again) { const a = document.createElement("button"); a.className = "main"; a.textContent = `「まだ」の${rv.again}枚をもう一周`; a.onclick = startCards; row.append(a); }
       const l = document.createElement("button"); l.textContent = "一覧を見る"; l.onclick = () => { rv.card = false; renderReview(); }; row.append(l);
       box.append(p, row); return;
     }
-    const c = chOf(f.ch), cx = fsContext(f);
+    const c = chOf(f.ch);
     const card = document.createElement("div"); card.className = `fs-card k-${f.kind || "q"}`;
     const w = document.createElement("div"); w.className = "w";
     const chip = document.createElement("span"); chip.className = "fs-chip"; chip.textContent = FSK[f.kind || "q"];
-    w.append(chip, `　${c.no}　${secTitle(f) || c.title}`);
-    const ctx = document.createElement("div"); ctx.className = "ctx"; const b = document.createElement("b"); b.textContent = cx.q; ctx.append(cx.pre, b, cx.post);
-    const ask = document.createElement("div"); ask.className = "ask"; ask.textContent = f.note || FS_ASK[f.kind || "q"];
+    w.append(chip, `　${f.pg ? "ページ　" : ""}${c.no}　${secTitle(f) || c.title}`);
+    const ask = document.createElement("div"); ask.className = "ask"; ask.textContent = f.note || (f.pg ? FS_ASK_PG : FS_ASK)[f.kind || "q"];
     const cnt = document.createElement("div"); cnt.className = "cnt"; cnt.textContent = `${rv.i + 1} / ${rv.queue.length}枚` + (f.n ? `・これまでに ${f.n}回 振り返った` : "・はじめて振り返る");
-    card.append(w, ctx, ask, cnt);
     const row = document.createElement("div"); row.className = "btnrow";
-    // 「覚える」「試験に出そう」は、選んだ言葉を伏せて出す(思い出してから開く)。「わからない」は伏せずに出す
-    if ((f.kind || "q") !== "q") {
-      b.classList.add("hide"); const sh = document.createElement("button"); sh.textContent = "答えを見る";
-      sh.onclick = () => { b.classList.remove("hide"); sh.remove(); };
-      row.append(sh);
-    }
     const ok = document.createElement("button"); ok.className = "main"; ok.textContent = "わかった";
     ok.onclick = () => { set(key, { ...f, done: true, n: (f.n || 0) + 1, rv: Date.now() }); repaintFs(key); afterFsChange(); rv.ok++; rv.i++; renderReview(); };
     const ag = document.createElement("button"); ag.textContent = "まだ(また出す)";
     ag.onclick = () => { set(key, { ...f, n: (f.n || 0) + 1, rv: Date.now() }); rv.again++; rv.i++; renderReview(); };
     const op = document.createElement("button"); op.textContent = "本で確かめる";
     op.onclick = () => { closeSheets(); jumpToFs(f.ch, key); toast("読み終えたら、上の「付箋」から続きを振り返れます"); };
+    if (f.pg) {
+      // ページの付箋:「わからない」はページの文章をそのまま出す。「覚える」「試験に出そう」は書き出しだけ見せて、思い出してから全文を開く
+      const body = document.createElement("div"); body.className = "pg"; body.textContent = f.q.replace(/[ \t]+/g, "").replace(/\n{2,}/g, "\n").trim();
+      if ((f.kind || "q") === "q") card.append(w, body, ask, cnt);
+      else {
+        const cue = document.createElement("div"); cue.className = "cue"; cue.style.whiteSpace = "pre-wrap";
+        cue.textContent = (f.hd && f.hd.length ? `このページの見出し:${f.hd.join("／")}\n` : "") + "書き出し:" + f.q.replace(/\s+/g, "").slice(0, 28) + "……";
+        body.hidden = true; card.append(w, cue, ask, body, cnt);
+        const sh = document.createElement("button"); sh.textContent = "ページの文章を見る";
+        sh.onclick = () => { body.hidden = false; cue.remove(); sh.remove(); };
+        row.append(sh);
+      }
+      row.append(ok, ag, op); box.append(card, row);
+      return;
+    }
+    const cx = fsContext(f);
+    const ctx = document.createElement("div"); ctx.className = "ctx"; const b = document.createElement("b"); b.textContent = cx.q; ctx.append(cx.pre, b, cx.post);
+    card.append(w, ctx, ask, cnt);
+    // 「覚える」「試験に出そう」は、選んだ言葉を伏せて出す(思い出してから開く)。「わからない」は伏せずに出す
+    if ((f.kind || "q") !== "q") {
+      b.classList.add("hide"); const sh = document.createElement("button"); sh.textContent = "答えを見る";
+      sh.onclick = () => { b.classList.remove("hide"); sh.remove(); };
+      row.append(sh);
+    }
     row.append(ok, ag, op); box.append(card, row);
     return;
   }
@@ -2610,14 +2850,15 @@ function renderReview() {
   go.append(st); box.append(go);
   box.append(segOf([["open", "まだ"], ["done", "わかった"], ["all", "すべて"]], rv.show, v => { rv.show = v; renderReview(); }));
   const list = (rv.show === "open" ? open : rv.show === "done" ? done : all).sort((a, b) => bookOrder(a.ch) - bookOrder(b.ch) || a.at - b.at);
-  if (!list.length) { const p = document.createElement("p"); p.style.cssText = "color:var(--ink-soft);font-size:13px;line-height:1.7;margin:0"; p.textContent = all.length ? "ここに出す付箋はありません。" : "まだ付箋はありません。読んでいて「わからない」「覚えたい」「試験に出そう」と思った所の文字を長押しで選び、「付箋」を押すと、はれます。"; box.append(p); return; }
+  if (!list.length) { const p = document.createElement("p"); p.style.cssText = "color:var(--ink-soft);font-size:13px;line-height:1.7;margin:0"; p.textContent = all.length ? "ここに出す付箋はありません。" : "まだ付箋はありません。読んでいて「わからない」「覚えたい」「試験に出そう」と思った言葉を長押しして「付箋」を押すと、はれます。ページごと振り返りたいときは、読書中に上の「付箋」→「このページに付箋をはる」。"; box.append(p); return; }
   for (const f of list) {
     const c = chOf(f.ch);
     const b = document.createElement("button"); b.className = `nb-item k-${f.kind || "q"}`;
     const w = document.createElement("span"); w.className = "w";
     const chip = document.createElement("span"); chip.className = "fs-chip" + (f.done ? " done" : ""); chip.textContent = f.done ? "わかった" : FSK[f.kind || "q"];
-    w.append(chip, `　${c.no}　${secTitle(f) || c.title}` + (f.n ? `・振り返り${f.n}回` : ""));
-    const q = document.createElement("span"); q.className = "q"; q.style.setProperty("--hlc", "var(--fsc)"); q.textContent = f.q.length > 140 ? f.q.slice(0, 140) + "…" : f.q;
+    w.append(chip, `　${f.pg ? "ページ　" : ""}${c.no}　${secTitle(f) || c.title}` + (f.n ? `・振り返り${f.n}回` : ""));
+    const qt = f.pg ? f.q.replace(/\s+/g, "") : f.q, lim = f.pg ? 70 : 140;
+    const q = document.createElement("span"); q.className = "q"; q.style.setProperty("--hlc", "var(--fsc)"); q.textContent = qt.length > lim ? qt.slice(0, lim) + "…" : qt;
     b.append(w, q);
     if (f.note) { const n = document.createElement("span"); n.className = "n"; n.textContent = f.note; b.append(n); }
     b.onclick = () => { closeSheets(); jumpToFs(f.ch, f.key); };
@@ -2626,7 +2867,17 @@ function renderReview() {
 }
 function jumpToFs(chId, key) {
   if (!cur || cur.id !== chId) openChapter(chId, null);
-  setTimeout(() => { const m = page.querySelector(`mark.fs[data-id="${CSS.escape(key)}"]`); if (m) { scrollToEl(m); alignLine(); onScroll(); } }, 260);
+  setTimeout(() => {
+    const m = page.querySelector(`mark.fs[data-id="${CSS.escape(key)}"]`);
+    if (m) { scrollToEl(m); alignLine(); onScroll(); return; }
+    // ページの付箋:その文章の頭の文字へ
+    const f = live(key); if (!f) return;
+    const root = page.querySelector(".chapter") || page, ft = flatText(root), s = findAnchor(ft.text, f); if (s < 0) return;
+    const p = pointOf(ft, s, false); if (!p) return;
+    const r = document.createRange(); r.setStart(p.n, p.o); r.setEnd(p.n, Math.min(p.n.nodeValue.length, p.o + 1));
+    const pr = page.getBoundingClientRect(), g = gutter(), b = r.getBoundingClientRect();
+    page.scrollLeft += b.right - (pr.right - g.r) + 2; alignLine(); onScroll();
+  }, 260);
 }
 
 /* ===== マイノート ===== */

@@ -1,7 +1,7 @@
-﻿// オフラインでも読めるように、本の中身(1ファイル)とアイコンを端末に保存しておく。
+// オフラインでも読めるように、本の中身(1ファイル)とアイコンを端末に保存しておく。
 // 本を更新したら CACHE_NAME の番号を上げる(上げないと古い版が配られ続ける)。
 // 音声(audio/*.mp3)は別の入れ物 AUDIO_CACHE に入れ、版を上げても消さない(URL の ?v= で中身の違いを見分ける)。
-const CACHE_NAME = "shinsho-keiei2-v7";
+const CACHE_NAME = "shinsho-keiei2-v8";
 const AUDIO_CACHE = "shinsho-audio";
 const scope = self.registration.scope;
 const FILES = ["", "index.html", "manifest.json", "icon-180.png", "icon-192.png", "icon-512.png"].map(f => new URL(f, scope).href);
