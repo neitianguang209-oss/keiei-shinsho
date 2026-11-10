@@ -90,7 +90,9 @@ button{font:inherit;color:inherit}
   padding:calc(env(safe-area-inset-top) + var(--padY,34px)) max(var(--mx),env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + var(--padY,34px)) max(var(--mx),env(safe-area-inset-left));
   /* 句読点を行末にぶら下げ、行頭に「、」「。」が来ないようにする(紙の本の組み方) */
   line-break:strict;hanging-punctuation:allow-end last;word-break:normal;
-  text-align:justify;font-feature-settings:"palt" 0;scrollbar-width:none;overscroll-behavior-x:contain}
+  text-align:justify;font-feature-settings:"palt" 0;scrollbar-width:none;overscroll-behavior-x:contain;
+  /* 文字に印をつけたり答えを開いたりしても、ブラウザが勝手に位置を動かさないように */
+  overflow-anchor:none}
 #page::-webkit-scrollbar{display:none}
 #page .chapter{display:block}
 #page p{margin:0;text-indent:1em}
@@ -145,7 +147,7 @@ svg .acc{stroke:var(--accent);fill:none;stroke-width:2.5} svg .shu{stroke:var(--
 #page .chk{display:flex;gap:.5em;align-items:flex-start;cursor:pointer;font-size:.9em;text-indent:0}
 #page .chk input{writing-mode:horizontal-tb;width:1.1em;height:1.1em;accent-color:var(--accent);margin:0}
 #page .done-btn{writing-mode:horizontal-tb;font-family:var(--gothic);font-size:13px;margin:0 2em;align-self:center;padding:12px 18px;border:1px solid var(--accent);background:var(--accent);color:var(--paper);border-radius:2px;cursor:pointer}
-#page .next-btn{writing-mode:horizontal-tb;font-family:var(--gothic);font-size:13px;margin:0 1em 0 3em;align-self:center;padding:12px 18px;border:1px solid var(--accent);background:none;color:var(--accent);border-radius:2px;cursor:pointer}
+#page .next-btn{writing-mode:horizontal-tb;font-family:var(--gothic);font-size:13px;margin:0 1em 0 3em;align-self:center;padding:12px 18px;border:1px solid var(--accent);background:none;color:var(--accent);border-radius:2px;cursor:pointer;max-width:min(78vw,420px);white-space:normal;line-height:1.6;text-align:left}
 #page .tail{display:flex;flex-direction:column;justify-content:center;gap:16px;padding:0 1em}
 /* 巻末の練習(答えを開く) */
 #page .yoko details.ans{margin-top:8px;border-top:1px dotted var(--rule);padding-top:6px}
@@ -182,19 +184,61 @@ body.reading-calm .chrome.top{transform:translateY(-100%)} body.reading-calm .ch
 #page mark.hl.c-y{--hl:color-mix(in srgb,#f2d34b 55%,transparent)} #page mark.hl.c-b{--hl:color-mix(in srgb,#79b8e8 50%,transparent)}
 #page mark.hl.c-p{--hl:color-mix(in srgb,#ef93b4 50%,transparent)} #page mark.hl.c-o{--hl:color-mix(in srgb,#f3a45b 55%,transparent)}
 #page mark.hl.note{box-shadow:inset -2px 0 0 var(--shu)}
-/* 付箋(振り返り用。マーカーとは別。文字に波線と小さな付箋の印) */
-#page mark.fs{position:relative;background:none;color:inherit;text-decoration:underline wavy var(--fsc);text-decoration-thickness:1.5px;text-underline-offset:.2em;text-underline-position:left;-webkit-text-decoration:underline wavy var(--fsc)}
-/* 行の右の隙間に、紙の付箋のような小さな帯を出す(場所を取らないので、ページ割りは変わらない) */
-#page mark.fs::before{content:"";position:absolute;top:-.1em;right:-.5em;width:.32em;height:1.3em;background:var(--fsc);border-radius:0 2px 2px 0;opacity:.9;pointer-events:none}
-#page mark.fs.done{text-decoration-style:dotted;-webkit-text-decoration-style:dotted} #page mark.fs.done::before{opacity:.3}
-.k-q{--fsc:#d9604c} .k-m{--fsc:#4f8fd1} .k-e{--fsc:#3f9a5a}
+/* 付箋(振り返り用)。文字そのものに付箋の色をマーカーのように塗る。付箋の書き始めだけ、行の右の隙間に小さな紙の帯を出す
+   (帯は場所を取らないので、ページ割りは変わらない)。わかった付箋は薄く残す */
+#page mark.fs{position:relative;color:inherit;border-radius:2px;background:color-mix(in srgb,var(--fsc) 30%,transparent);
+  -webkit-box-decoration-break:clone;box-decoration-break:clone}
+#page mark.fs mark.fs{background:color-mix(in srgb,var(--fsc) 34%,transparent)}
+#page mark.fs.first::before{content:"";position:absolute;top:-.15em;right:-.55em;width:.3em;height:1.2em;background:var(--fsc);border-radius:0 2px 2px 0;pointer-events:none}
+#page mark.fs.done{background:color-mix(in srgb,var(--fsc) 12%,transparent)} #page mark.fs.done.first::before{opacity:.35}
+/* 付箋の色(種類ごと。設定で変えられる。端末間で同期) */
+:root{--fs-q:#d9604c;--fs-m:#4f8fd1;--fs-i:#3f9a5a}
+.k-q{--fsc:var(--fs-q)} .k-m{--fsc:var(--fs-m)} .k-i{--fsc:var(--fs-i)}
+.palette{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.palette button{width:30px;height:30px;border-radius:50%;border:2px solid var(--box);box-shadow:0 0 0 1px var(--rule);cursor:pointer;padding:0}
+.palette button.on{box-shadow:0 0 0 2px var(--ink)}
+/* 考えてみよう:回答例を開くボタン(縦書きの中に横書きの小さなボタン) */
+#page .qa-btn{writing-mode:horizontal-tb;font-family:var(--gothic);font-size:12px;line-height:1.4;margin:.6em .2em 0;padding:6px 10px;border:1px solid var(--accent);background:var(--paper);color:var(--accent);border-radius:14px;cursor:pointer;text-indent:0;vertical-align:middle;white-space:nowrap}
+#page .qa-btn.seen{background:var(--accent-soft)}
+#page .yoko .qa-btn{margin:6px 0 2px;display:table}
+template{display:none}
+/* キーワード:押すと、その言葉が出てくるページへ。数字はそのページ */
+#page .kwi{cursor:pointer;border-radius:2px;text-decoration:underline dotted color-mix(in srgb,var(--accent) 60%,transparent);text-underline-offset:.25em;-webkit-text-decoration:underline dotted color-mix(in srgb,var(--accent) 60%,transparent)}
+#page .kwi:active{background:var(--accent-soft)}
+#page .kw-note{font-size:.95em;letter-spacing:0;margin-inline-start:.6em;color:var(--ink-soft)}
+#page .kwp{font-family:var(--gothic);font-size:.7em;color:var(--accent);margin:0 .15em;text-decoration:none}
+/* 回答例の引き出し */
+.qa-q{font-family:var(--mincho);font-size:16px;line-height:1.8;background:var(--paper);padding:10px 12px;border-radius:6px;border-left:4px solid var(--accent)}
+.qa-ans{font-family:var(--mincho);font-size:15.5px;line-height:1.9;display:flex;flex-direction:column;gap:2px}
+.qa-ans p{margin:0 0 .5em}
+.qa-ans b{font-weight:700;background:linear-gradient(transparent 62%,var(--mark) 62%)}
+.qa-ptsbox{border:1px dashed var(--accent);border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;background:var(--paper)}
+.qa-ptsbox .h{font-size:12px;color:var(--accent);font-weight:700}
+.qa-ptsbox label{display:flex;gap:8px;align-items:flex-start;font-size:13.5px;line-height:1.6;cursor:pointer}
+.qa-ptsbox input{accent-color:var(--accent);width:18px;height:18px;flex:none;margin-top:1px}
+.qa-hint{font-size:12px;color:var(--ink-soft);line-height:1.7}
+/* 前の場所へ戻る小さな札(キーワードや検索で飛んだあと) */
+.backchip{position:fixed;z-index:6;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 30px);font-family:var(--gothic);font-size:13px;
+  background:var(--ink);color:var(--paper);border:0;border-radius:20px;padding:9px 16px;box-shadow:0 3px 12px rgba(0,0,0,.25);cursor:pointer;white-space:nowrap;max-width:92vw;overflow:hidden;text-overflow:ellipsis}
+body.listening .backchip{bottom:calc(var(--playerH,0px) + 12px)}
+/* 付箋・マーカーのページだけ読む */
+.markbar{position:fixed;z-index:6;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top) + 6px);display:flex;gap:6px;align-items:center;
+  font-family:var(--gothic);font-size:12px;background:var(--box);border:1px solid var(--rule);border-radius:18px;padding:4px 6px 4px 12px;box-shadow:0 2px 10px rgba(0,0,0,.15);max-width:96vw}
+.markbar .mb-t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.markbar button{border:1px solid var(--rule);background:var(--paper);border-radius:14px;padding:5px 10px;cursor:pointer;white-space:nowrap;font-size:12px}
+.markbar button.x{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+body:not(.reading-calm) .markbar{top:calc(env(safe-area-inset-top) + 60px)}
+.mk-kinds{display:flex;gap:6px;flex-wrap:wrap}
+.mk-kinds button{border:1px solid var(--rule);background:var(--paper);border-radius:16px;padding:7px 12px;cursor:pointer;font-size:13px;display:flex;gap:6px;align-items:center}
+.mk-kinds button.on{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink);font-weight:700}
+.mk-kinds .sw{width:12px;height:12px;border-radius:50%;background:var(--fsc)}
 .fs-chip{display:inline-block;font-size:11px;padding:1px 7px;border-radius:2px 2px 6px 6px;color:#fff;background:var(--fsc);flex:none}
 .fs-chip.done{opacity:.45}
 .fs-sum{display:flex;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--ink-soft);align-items:center}
 .fs-card{border:1px solid var(--rule);border-top:6px solid var(--fsc);background:var(--paper);border-radius:4px;padding:14px;display:flex;flex-direction:column;gap:10px}
 .fs-card .w{font-size:11px;color:var(--ink-soft)}
 .fs-card .ctx{font-family:var(--mincho);font-size:16px;line-height:1.9;color:var(--ink-soft)}
-.fs-card .ctx b{color:var(--ink);font-weight:400;text-decoration:underline wavy var(--fsc);text-underline-offset:.3em}
+.fs-card .ctx b{color:var(--ink);font-weight:400;background:color-mix(in srgb,var(--fsc) 30%,transparent);border-radius:2px}
 .fs-card .ctx b.hide{color:transparent;background:repeating-linear-gradient(45deg,color-mix(in srgb,var(--fsc) 22%,transparent) 0 6px,color-mix(in srgb,var(--fsc) 10%,transparent) 6px 12px);border-radius:3px;text-decoration:none}
 .fs-card .ask{font-size:14px;background:var(--box);padding:8px 10px;border-radius:4px;border-left:4px solid var(--fsc)}
 .fs-card .cnt{font-size:11px;color:var(--ink-soft)}
@@ -243,7 +287,7 @@ body.reading-calm .chrome.top{transform:translateY(-100%)} body.reading-calm .ch
 .btnrow button{border:1px solid var(--rule);background:var(--paper);border-radius:6px;padding:9px 14px;cursor:pointer}
 .btnrow button.main{background:var(--accent);border-color:var(--accent);color:var(--paper)}
 .btnrow button.danger{color:var(--shu)}
-.runhead{position:fixed;top:calc(env(safe-area-inset-top) + 8px);left:0;right:0;text-align:center;font-family:var(--gothic);font-size:10px;color:var(--ink-soft);pointer-events:none;letter-spacing:.1em}
+.runhead{position:fixed;z-index:3;top:calc(env(safe-area-inset-top) + 8px);left:0;right:0;text-align:center;font-family:var(--gothic);font-size:10px;color:var(--ink-soft);pointer-events:none;letter-spacing:.1em}
 .folio{position:fixed;bottom:calc(env(safe-area-inset-bottom) + 6px);left:0;right:0;text-align:center;font-family:var(--gothic);font-size:10px;color:var(--ink-soft);pointer-events:none;font-variant-numeric:tabular-nums}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 70px);background:var(--ink);color:var(--paper);font-family:var(--gothic);font-size:13px;padding:10px 16px;border-radius:20px;z-index:9;max-width:90vw;display:flex;gap:12px;align-items:center}
 .toast button{background:none;border:1px solid currentColor;color:inherit;border-radius:14px;padding:4px 10px;cursor:pointer}
@@ -315,6 +359,7 @@ body.listening .foot{display:none}
   <div class="sync" id="sync"><span class="led"></span><span id="synctxt">同期の準備中</span></div>
   <div class="tools">
     <button id="h-review">付箋で振り返る</button>
+    <button id="h-marks">付箋・マーカーのページだけ読む</button>
     <button id="h-aa">Aa 表示の設定</button>
     <button id="h-notes">マイノート(マーカーとメモ)</button>
     <button id="h-search">本の中を検索</button>
@@ -330,6 +375,8 @@ body.listening .foot{display:none}
   <div class="foot" id="foot"><span id="ft-left"></span><span id="folio"></span><span id="ft-right"></span></div>
   <div class="ribbon" id="ribbon" hidden></div>
   <button class="pagetab" id="pagetab" hidden aria-label="このページの付箋">付箋</button>
+  <div class="markbar" id="markbar" hidden><span class="mb-t" id="mb-t"></span><button id="mb-kind">一覧・種類</button><button class="x" id="mb-exit">ふつうに読む</button></div>
+  <button class="backchip" id="backchip" hidden></button>
   <div class="chrome top">
     <button id="back">目次</button>
     <div class="ttl" id="ttl"></div>
@@ -372,6 +419,7 @@ body.listening .foot{display:none}
   <button class="dot c-o" data-c="o" aria-label="オレンジのマーカー"></button>
   <button id="st-note">メモ</button>
   <button id="st-copy">コピー</button>
+  <button id="st-ext" aria-label="選ぶ範囲を次のページまでのばす">次ページへ</button>
 </div>
 
 <!-- Aa 表示の設定 -->
@@ -418,9 +466,34 @@ body.listening .foot{display:none}
 <div class="sheet" id="sh-fs" hidden><div class="sheet-body">
   <div class="sheet-h"><span id="fs-h">付箋をはる</span><button data-close>閉じる</button></div>
   <div class="nb-item" style="cursor:default"><span class="q" id="fs-q"></span></div>
-  <div class="opt"><span>どんな付箋?</span><div class="seg" id="fs-kind"><button data-v="q" class="k-q"><span class="sw" style="background:var(--fsc)"></span>わからない</button><button data-v="m" class="k-m"><span class="sw" style="background:var(--fsc)"></span>覚える</button><button data-v="e" class="k-e"><span class="sw" style="background:var(--fsc)"></span>試験に出そう</button></div></div>
+  <div class="opt"><span>どんな付箋?</span><div class="seg" id="fs-kind"><button data-v="q" class="k-q"><span class="sw" style="background:var(--fsc)"></span>わからない</button><button data-v="m" class="k-m"><span class="sw" style="background:var(--fsc)"></span>覚える・試験に出そう</button><button data-v="i" class="k-i"><span class="sw" style="background:var(--fsc)"></span>興味深い</button></div></div>
+  <div class="opt"><span id="fs-colh">この種類の色(同じ種類の付箋がすべてこの色になります)</span><div class="palette" id="fs-pal"></div></div>
   <div class="opt"><span>振り返るときの自分への問い(なくてもよい)</span><textarea id="fs-note" placeholder="例:なぜ利益が出ているのにお金が足りなくなるの? ／ ROEの3つの分け方を言えるか"></textarea></div>
   <div class="btnrow"><button class="main" id="fs-save">はる</button><button id="fs-done" hidden>わかった</button><button class="danger" id="fs-del" hidden>はがす</button></div>
+</div></div>
+
+<!-- 考えてみよう:回答例 -->
+<div class="sheet" id="sh-qa" hidden><div class="sheet-body">
+  <div class="sheet-h"><span id="qa-h">考えてみよう</span><button data-close>閉じる</button></div>
+  <div class="qa-q" id="qa-q"></div>
+  <div class="opt" id="qa-mybox"><span>まず自分で答えてみる(書かなくても、頭の中で組み立てるだけでもOK。書いた答えは端末間で同期されます)</span><textarea id="qa-my" placeholder="原因と結果、違いと理由をセットで"></textarea></div>
+  <div class="btnrow" id="qa-openrow"><button class="main" id="qa-open">考えた。回答例を見る</button></div>
+  <div id="qa-body" hidden>
+    <div class="qa-ans" id="qa-ans"></div>
+    <div class="qa-ptsbox"><span class="h">ここが書けていれば得点(書けたものにチェック)</span><div id="qa-pts"></div></div>
+    <p class="qa-hint" id="qa-hint"></p>
+    <div class="btnrow"><button id="qa-hide">回答例を隠す</button><button id="qa-go">本文で確かめる</button></div>
+  </div>
+</div></div>
+
+<!-- 付箋・マーカーのページだけ読む:種類を選ぶ -->
+<div class="sheet" id="sh-mk" hidden><div class="sheet-body">
+  <div class="sheet-h"><span>しるしのあるページだけ読む</span><button data-close>閉じる</button></div>
+  <p class="qa-hint" style="margin:0">付箋やマーカーをつけたページだけを、本の順にめくれます。指で払う・端をタップすると、次のしるしのページ(章をまたいでも)へ飛びます。</p>
+  <div class="mk-kinds" id="mk-kinds"></div>
+  <div class="opt"><span>わかった付箋</span><div class="seg" id="mk-done"><button data-v="0">はぶく</button><button data-v="1">ふくめる</button></div></div>
+  <div class="btnrow"><button class="main" id="mk-start">この条件で読む</button></div>
+  <div id="mk-list"></div>
 </div></div>
 
 <!-- 付箋で振り返る -->
@@ -623,8 +696,8 @@ body.listening .foot{display:none}
 <p class="kw">ビジネスの言語／貸借対照表／損益計算書／売上総利益／営業利益／経常利益／税金等調整前当期純利益／当期純利益／利害関係者／契約の集合体／意思決定支援機能／利害調整機能／実数分析／比率分析／構成比分析／関係比分析／趨勢比分析／時系列分析／クロスセクション分析／相対業績評価／決算短信／業績予想修正／資本コスト／ＥＤＩＮＥＴ／ＥＤＧＡＲ／ＩＲ／非財務情報／ＥＳＧ／利益マネジメント／粉飾／経済的帰結／収斂／全面適用／実証会計研究／反証可能</p>
 <p class="end-h">考えてみよう</p>
 <ol>
-<li>財務諸表の「意思決定支援機能」と「利害調整機能」の違いを、利害関係者を一人選んで具体的に説明しなさい。</li>
-<li>利益マネジメントとは何か。粉飾とどう違うか、また経営者が利益を調整しようとする理由とあわせて説明しなさい。</li>
+<li>財務諸表の「意思決定支援機能」と「利害調整機能」の違いを、利害関係者を一人選んで具体的に説明しなさい。<template class="qa" data-ch="ch1" data-n="1" data-sec="ch1-3"><div class="qa-a"><p><b>意思決定支援機能</b>は、契約を結ぶ<b>前</b>に「この相手と契約してよいか」を判断するために財務諸表を使う働きであり、<b>利害調整機能</b>は、契約を結んだ<b>あと</b>に、約束が守られているか、経営者が自分たちに不利な行動をしていないかを確かめる働きである。</p><p>たとえば銀行(債権者)の場合、融資の前には財務諸表から返済能力や安全性を読み、貸すかどうか、どんな条件で貸すかを決める(意思決定支援機能)。融資のあとには、毎期の財務諸表で、貸したお金と利息を回収できそうか、約束した条件が守られているかを見張る(利害調整機能)。</p><p>会社はさまざまな利害関係者との「契約の集合体」であり、同じ財務諸表が、契約の前と後で異なる役割を果たしているのである。</p></div><div class="qa-pts"><p>契約の「前」=意思決定支援/「後」=利害調整、と時点で区別している</p><p>利害関係者を一人に決めて、前と後それぞれの具体的な使い方を書いている</p><p>会社は利害関係者との「契約の集合体」という前提に触れている</p></div></template></li>
+<li>利益マネジメントとは何か。粉飾とどう違うか、また経営者が利益を調整しようとする理由とあわせて説明しなさい。<template class="qa" data-ch="ch1" data-n="2" data-sec="ch1-6"><div class="qa-a"><p><b>利益マネジメント</b>とは、会計ルールで認められた複数の会計方法や見積もりの<b>選択の幅</b>を使って、経営者が報告する利益を調整することである。たとえば、機械の減価償却の方法や耐用年数の選び方によって、毎年の費用と利益の額は変わる。</p><p>あくまで<b>ルールの範囲内</b>の行動である点で、ルールを破って利益を偽る<b>粉飾</b>とは区別される。</p><p>経営者が利益を調整しようとするのは、会計数値の公表が、株価、経営者の報酬(ボーナス)、借入れの条件などに実際の影響を与えるからである。これを<b>経済的帰結</b>という。数字が現実を動かすので、人は数字を動かしたくなるのである。</p></div><div class="qa-pts"><p>会計方法・見積もりの選択の幅を使って利益を調整する、という定義</p><p>ルールの範囲内(利益マネジメント)/ルール違反(粉飾)の違い</p><p>理由として「経済的帰結」(株価・報酬・借入条件への影響)を書いている</p></div></template></li>
 </ol>
 </div>
 </section>
@@ -807,8 +880,8 @@ body.listening .foot{display:none}
 <p class="kw">キャッシュ・フロー計算書／信用取引／設備投資／一致の原則／支払能力／資金繰り／客観性／連結キャッシュ・フロー計算書／営業活動によるキャッシュ・フロー／投資活動によるキャッシュ・フロー／財務活動によるキャッシュ・フロー／直接法／間接法／税金等調整前当期純利益／非キャッシュ損益項目／減価償却費／減損損失／引当金／運転資本／小計／表示区分／経営パターン／ライフサイクル／対角線</p>
 <p class="end-h">考えてみよう</p>
 <ol>
-<li>会計利益とキャッシュ・フローがずれる原因を二つあげ、それでも全期間では両者が一致する理由を説明しなさい。</li>
-<li>営業ＣＦ＋・投資ＣＦ－・財務ＣＦ－の会社と、営業ＣＦ－・投資ＣＦ＋・財務ＣＦ＋の会社は、それぞれどのような状態だと読めるか。</li>
+<li>会計利益とキャッシュ・フローがずれる原因を二つあげ、それでも全期間では両者が一致する理由を説明しなさい。<template class="qa" data-ch="ch2" data-n="1" data-sec="ch2-2"><div class="qa-a"><p>ずれる原因の一つめは<b>信用取引</b>である。掛けで売り買いをすると、売上や費用は取引をしたときに計上されるが、お金が動くのはあとになる。</p><p>二つめは<b>設備投資</b>である。機械を買うとお金は買った年にまとめて出ていくが、利益の計算では<b>減価償却</b>によって、使う年数に分けて少しずつ費用にする(例:一千万円の機械を五年で償却すれば、毎年二百万円の費用)。</p><p>どちらも、収益・費用を記録する<b>時期</b>と、お金が動く<b>時期</b>の違いにすぎない。掛けの代金はいずれ回収され、機械の代金も耐用年数を通じてすべて費用になる。だから会社が生まれてから終わるまでの<b>全期間</b>を合計すれば、利益の合計とキャッシュ・フローの合計は等しくなる(<b>一致の原則</b>)。ただし会社の存続は途中の一年一年の資金繰りで決まるので、キャッシュ・フロー計算書が必要になる。</p></div><div class="qa-pts"><p>原因①信用取引(計上とお金の受払いの時期のずれ)</p><p>原因②設備投資(一度に支出/減価償却で分けて費用)</p><p>どちらも「時期」の違いなので全期間では一致する(一致の原則)</p></div></template></li>
+<li>営業ＣＦ＋・投資ＣＦ－・財務ＣＦ－の会社と、営業ＣＦ－・投資ＣＦ＋・財務ＣＦ＋の会社は、それぞれどのような状態だと読めるか。<template class="qa" data-ch="ch2" data-n="2" data-sec="ch2-6"><div class="qa-a"><p><b>営業ＣＦ＋・投資ＣＦ－・財務ＣＦ－</b>の会社は、本業で稼いだお金で新しい投資をまかない、さらに借入金の返済など有利子負債の圧縮もできている状態である。もっとも望ましい経営パターンで、ライフサイクルでいえば<b>成熟期</b>にあたる。</p><p><b>営業ＣＦ－・投資ＣＦ＋・財務ＣＦ＋</b>の会社は、本業でお金を稼げず、土地や設備、有価証券などの資産を売ったり(投資ＣＦがプラス)、借入れなどでお金を集めたり(財務ＣＦがプラス)して、手元のお金を保っている状態である。営業活動が不振で、この状態が続けば成長の鈍化による<b>倒産の危険性</b>が高まる(<b>衰退期</b>)。</p></div><div class="qa-pts"><p>前者:稼いだお金で投資し借金も返している=最も望ましい(成熟期)</p><p>後者:本業不振を資産の売却と資金調達で補っている(衰退期)</p><p>それぞれの符号の意味(投資ＣＦ＋=資産売却、財務ＣＦ－=返済)を説明している</p></div></template></li>
 </ol>
 </div>
 </section>
@@ -933,7 +1006,7 @@ body.listening .foot{display:none}
 <p class="kw">営業ＣＦマージン／自己資本営業ＣＦ比率／営業ＣＦ対流動負債比率／債務償還年数／有利子負債／営業ＣＦ対利払率／インタレスト・カバレッジ・レシオ／設備投資比率／正味設備投資額／投資ＣＦ対営業ＣＦ比率／フリー・キャッシュ・フロー／企業価値評価／間便法／ＮＯＰＬＡＴ／ＥＢＩＴ／ＣＡＰＥＸ／増加運転資本</p>
 <p class="end-h">考えてみよう</p>
 <ol>
-<li>フリー・キャッシュ・フローとは何か。二つの算定方法を示し、ＦＣＦがマイナスの会社をどう評価すべきか述べなさい。</li>
+<li>フリー・キャッシュ・フローとは何か。二つの算定方法を示し、ＦＣＦがマイナスの会社をどう評価すべきか述べなさい。<template class="qa" data-ch="ch3" data-n="1" data-sec="ch3-4"><div class="qa-a"><p><b>フリー・キャッシュ・フロー(ＦＣＦ)</b>とは、本業で得た正味のキャッシュ・インフローから、法人税等と、事業を続けるために必要な設備投資を差し引いた、会社が<b>自由に使えるお金</b>である。借入金の返済、株主への配当、新しい事業への投資に使えるため、経営成果の判断基準や企業価値評価に使われる。</p><p>算定方法は二つある。</p><p>① ＦＣＦ ＝ <b>営業ＣＦ ＋ 投資ＣＦ</b><br>② ＦＣＦ ＝ <b>営業ＣＦの小計 － 法人税等の支払額 － 正味設備投資額</b>(設備の取得のための支出－売却収入)</p><p>ＦＣＦがマイナスだからといって、すぐに悪い会社とは言えない。将来の成長のために大きな設備投資をした年なのか(例:三越伊勢丹は営業ＣＦの小計約七十億円に対し、二百九十億円を超える設備投資でＦＣＦは約マイナス二百六十五億円)、それとも本業がお金を生まなくなっているのかを、営業ＣＦの水準や投資の中身、数年の推移から見極める必要がある。</p></div><div class="qa-pts"><p>定義:本業のお金－法人税等－設備投資=自由に使えるお金</p><p>算定方法を二つとも式で書いている(営業ＣＦ＋投資ＣＦ/小計－法人税等－正味設備投資)</p><p>マイナスでも直ちに悪いとは言えない理由(投資のためか、本業不振か)を書いている</p></div></template></li>
 </ol>
 </div>
 </section>
@@ -1147,8 +1220,8 @@ body.listening .foot{display:none}
 <p class="kw">業績の推移／成長性分析／前期比／趨勢比／ベース年度／年平均成長率／幾何平均／算術平均／売上高成長率／増収率／ベンチマーク／セグメント情報／生産、受注及び販売の状況／受注残高／使用総資本／内部留保／サステイナブル成長率／ＲＯＥ／配当性向／利益の質／利益の持続性／研究開発投資／情報の非対称性／設備の状況／従業員の状況／平均勤続年数／決算短信／経営者予想／予想の改訂／上方修正／下方修正／ＩＲカレンダー／ポートフォリオ／中央値／平均回帰</p>
 <p class="end-h">考えてみよう</p>
 <ol>
-<li>年平均成長率を求めるとき、各年の前期比を単純に平均してはいけないのはなぜか。具体的な数値例を使って説明しなさい。</li>
-<li>上場企業を売上高成長率で十のグループに分けて追跡すると、どのような傾向が見られるか。その現象の名前と、分析をするうえでの教訓を述べなさい。</li>
+<li>年平均成長率を求めるとき、各年の前期比を単純に平均してはいけないのはなぜか。具体的な数値例を使って説明しなさい。<template class="qa" data-ch="ch4" data-n="1" data-sec="ch4-2"><div class="qa-a"><p>伸び率は、前の年の値を土台にして<b>掛け算で積み重なっていく</b>。ところが前期比を足して年数で割る<b>算術平均</b>では、割り算の土台が年ごとに変わることが無視されるため、実態とずれる(伸び率のばらつきが大きいほど高めに出る)。</p><p>たとえば売上高が 100 → 110 → 100 と動いたとする。前期比は＋10％と－9.1％(10÷110)で、算術平均は約＋0.45％になる。しかし二年たっても売上は 100 のままで、実際の伸びはゼロである。</p><p>そこで「毎年同じ率で伸びたとしたら何％か」を、何乗根を使う<b>幾何平均</b>で求める。これが<b>年平均成長率</b>で、(<sup>年数</sup>√(当期実績値÷ベース年度実績値)－１)×100 で計算する。この例では √(100÷100)－１＝0％ となり、実態と一致する。</p></div><div class="qa-pts"><p>伸び率は掛け算で積み重なる(土台が毎年変わる)ことを書いている</p><p>数値例で算術平均がずれることを示している(例:100→110→100)</p><p>幾何平均(年平均成長率)の式で正しく求められることを書いている</p></div></template></li>
+<li>上場企業を売上高成長率で十のグループに分けて追跡すると、どのような傾向が見られるか。その現象の名前と、分析をするうえでの教訓を述べなさい。<template class="qa" data-ch="ch4" data-n="2" data-sec="ch4-7"><div class="qa-a"><p>ベース年度の売上高成長率で会社を十のグループに分け、顔ぶれを変えずに追いかけると、成長率が飛び抜けて高かったグループ(中央値で二七〜二八％ほど)も、マイナスに沈んでいたグループ(－六〜七％ほど)も、<b>一年後にはほぼ同じ水準に集まり</b>、その後も似た水準に落ち着いていく。ＲＯＥで同じ分析をしても同じ傾向が見られる。</p><p>この現象を<b>平均回帰</b>という。極端に高い(低い)成長率は、大きな注文やライバルの失敗のような一時的な追い風(逆風)によることが多く、もうかる市場には競争相手も集まるためである。</p><p>分析の<b>教訓</b>は、今年の高い伸びや低い伸びを、そのまま将来に引き伸ばして予測してはいけない、ということである。数字はある程度の水準に落ち着いていくという前提で分析する必要がある。</p></div><div class="qa-pts"><p>高いグループも低いグループも同じ水準に集まる、という傾向</p><p>現象の名前「平均回帰」(ＲＯＥでも同じ)</p><p>教訓:今年の伸びを将来にそのまま引き伸ばさない</p></div></template></li>
 </ol>
 </div>
 
@@ -1323,8 +1396,8 @@ body.listening .foot{display:none}
 <p class="kw">付加価値／経営資源／控除法／加算法／人件費／賃借料／金融費用／減価償却費／税金／税引後利益／粗付加価値／労働生産性／付加価値率／従業員一人当たり売上高／労働分配率／一人当たり人件費</p>
 <p class="end-h">考えてみよう</p>
 <ol>
-<li>付加価値の控除法と加算法を説明し、加算法の各項目がそれぞれだれへの分配にあたるかを述べなさい。</li>
-<li>ある会社の労働分配率が前の年より上がった。考えられる原因を、分解式を使って二つ述べなさい。</li>
+<li>付加価値の控除法と加算法を説明し、加算法の各項目がそれぞれだれへの分配にあたるかを述べなさい。<template class="qa" data-ch="ch5" data-n="1" data-sec="ch5-2"><div class="qa-a"><p><b>付加価値</b>とは、外部から購入した原材料・部品・サービスをもとに、企業が経済活動によって新しく生み出した価値である。</p><p><b>控除法</b>は、売上高から外部から受け入れた購入額を差し引いて求める(全体から他人の分を引く)。<b>加算法</b>は、生み出した価値の行き先を足し上げて求める。足すのは、人件費・賃借料・金融費用・減価償却費・税金・税引後利益である(調査機関の統計はほぼ加算法)。</p><p>各項目の分配先は、<b>人件費</b>は従業員へ、<b>賃借料</b>は土地や建物の貸し手へ、<b>金融費用</b>(支払利息)はお金を貸した銀行などの債権者へ、<b>税金</b>は国や地方自治体へ、<b>税引後利益</b>は株主と会社自身(内部留保)へ渡る。<b>減価償却費</b>は、価値を生み出すのに使った設備がすり減った分にあたる(減価償却費を含めたものを粗付加価値という)。</p></div><div class="qa-pts"><p>控除法=売上高－外部購入額、加算法=分配先の合計、の違い</p><p>加算法の六項目をすべて挙げている</p><p>各項目の分配先(従業員・貸し手・債権者・国・株主と会社)を対応させている</p></div></template></li>
+<li>ある会社の労働分配率が前の年より上がった。考えられる原因を、分解式を使って二つ述べなさい。<template class="qa" data-ch="ch5" data-n="2" data-sec="ch5-4"><div class="qa-a"><p>労働分配率は、分母と分子の間に従業員数をはさむと、次のように分解できる。</p><p><b>労働分配率 ＝ 人件費÷付加価値 ＝ 一人当たり人件費 ÷ 労働生産性</b></p><p>したがって、労働分配率が上がった原因は二つ考えられる。</p><p>① 分子の<b>一人当たり人件費が上がった</b>(賃上げなど、従業員への分配を手厚くした)。</p><p>② 分母の<b>労働生産性が下がった</b>(付加価値が減った、または従業員が増えたなど、稼ぐ力が落ちた)。労働生産性はさらに、付加価値率×従業員一人当たり売上高に分解して原因を探れる。</p><p>同じ「分配率の上昇」でも、①なら賃上げ、②なら稼ぐ力の低下で、意味は正反対である。たとえばサイゼリヤは、一人当たり人件費が約6％減ったのに、労働生産性がそれ以上(約7％)下がったため、労働分配率は55.3％から55.9％に上がっていた。</p></div><div class="qa-pts"><p>分解式 労働分配率=一人当たり人件費÷労働生産性 を書いている</p><p>原因①一人当たり人件費の上昇(賃上げ)</p><p>原因②労働生産性の低下(稼ぐ力の低下)。意味が正反対になることに触れている</p></div></template></li>
 </ol>
 </div>
 </section>
@@ -1501,8 +1574,8 @@ body.listening .foot{display:none}
 <p class="kw">経済的付加価値(ＥＶＡ)／税引後営業利益／期首投下資本／資本コスト／価値犠牲／割引率／切捨率／時間的価値／借入／社債／新株の発行／利益の留保／機会損失／リスクマネー／有限責任／加重平均資本コスト(ＷＡＣＣ)／資本構成／負債コスト／株主資本コスト／節税効果／実効税率／ＣＡＰＭ／リスクフリー・レート／市場ポートフォリオ／β</p>
 <p class="end-h">考えてみよう</p>
 <ol>
-<li>株主資本コストが負債コストより高くなるのはなぜか。また、利益の留保(内部留保)にもコストがあると言えるのはなぜか。</li>
-<li>黒字の会社でも経済的付加価値(ＥＶＡ)がマイナスになることがある。その理由を、資本コストの考え方を使って説明しなさい。</li>
+<li>株主資本コストが負債コストより高くなるのはなぜか。また、利益の留保(内部留保)にもコストがあると言えるのはなぜか。<template class="qa" data-ch="ch6" data-n="1" data-sec="ch6-3"><div class="qa-a"><p>銀行などの債権者は、会社の業績にかかわらず元本と利息の返済を求めることができ、会社にとって必ず返さなければならないお金である。一方、株主が出したお金は、会社がつぶれても返すよう求めることができない。株主は会社と一緒に<b>リスクを背負っている</b>(<b>リスクマネー</b>)ため、その分、銀行の利息より高いリターン(配当や株価の上昇)を期待する。この期待するリターンが会社にとってのコストなので、<b>株主資本コストは負債コストより高くなる</b>。さらに負債の利息は費用として税金を減らす(節税効果)ので、税引後の負債コストはいっそう低くなる。</p><p><b>利益の留保</b>(内部留保)は、帳簿の上では支払いが生じないので、コストがないように見える。しかし、そのお金を配当として株主に配っていれば、株主はほかの会社に投資して利益を得られたはずである。その<b>得られたはずの利益(機会損失)</b>が、内部留保のコストである。</p></div><div class="qa-pts"><p>債権者は必ず返済を求められる/株主は返済を求められずリスクを負う(リスクマネー)</p><p>リスクを負う分、株主はより高いリターンを期待する=コストが高い</p><p>内部留保のコスト=株主が他に投資すれば得られた利益(機会損失)</p></div></template></li>
+<li>黒字の会社でも経済的付加価値(ＥＶＡ)がマイナスになることがある。その理由を、資本コストの考え方を使って説明しなさい。<template class="qa" data-ch="ch6" data-n="2" data-sec="ch6-7"><div class="qa-a"><p><b>経済的付加価値(ＥＶＡ)＝ 税引後営業利益 － 加重平均資本コスト(ＷＡＣＣ)× 期首投下資本</b></p><p>会社が事業に使うお金は、銀行から借りたものも株主から預かったものも、ただではない。お金を出した人は、利息や配当・値上がりといったリターンを期待しており、それが会社にとっての<b>資本コスト</b>(お金の値段)である。ところが会計上の利益の計算では、利息は費用になっても、<b>株主が期待するリターンは差し引かれない</b>。</p><p>そのため、税引後営業利益がプラス(黒字)でも、投下資本にＷＡＣＣを掛けた資本コストの額に届かなければ、ＥＶＡはマイナスになる。たとえば投下資本一千億円、ＷＡＣＣ4.4％なら資本コストは四十四億円で、税引後営業利益が四十億円の会社は黒字でもＥＶＡはマイナス四億円となる。これは、出資者の期待に応えられず、<b>実質的には価値を壊している</b>ことを意味する。</p></div><div class="qa-pts"><p>ＥＶＡの式(税引後営業利益－ＷＡＣＣ×期首投下資本)</p><p>会計上の利益は株主資本のコストを差し引いていない</p><p>利益が資本コストの額を下回れば黒字でもマイナス=価値を壊している(数値例があるとよい)</p></div></template></li>
 </ol>
 </div>
 </section>
@@ -1714,8 +1787,8 @@ body.listening .foot{display:none}
 <p class="kw">会計利益の質／発生主義会計／見積もり／恣意性／ノイズ／利益マネジメント／利益調整／利益数値制御／粉飾／機会主義的選択／効率的選択(効率的契約)／情報提供的選択／会計的裁量行動／実体的裁量行動／押し込み販売／表示区分シフティング／期間相互間／同一期間内／利益捻出型／利益圧縮型／利益平準化／ボーナス・プラン／目標利益／ビッグバス／財務制限条項／新規株式公開／マネジメント・バイアウト／政治的コスト／経営者交代／会計発生高／総会計発生高／裁量的会計発生高／非裁量的会計発生高／利益の分布テスト</p>
 <p class="end-h">考えてみよう</p>
 <ol>
-<li>会計的裁量行動と実体的裁量行動の違いを、それぞれ具体例をあげて説明しなさい。</li>
-<li>標準的なボーナス・プランのもとで、経営者の利益マネジメントの戦略が利益の水準によってどう変わるかを説明しなさい。</li>
+<li>会計的裁量行動と実体的裁量行動の違いを、それぞれ具体例をあげて説明しなさい。<template class="qa" data-ch="ch7" data-n="1" data-sec="ch7-4"><div class="qa-a"><p><b>会計的裁量行動</b>は、取引そのものには手をつけず、<b>会計方法の選択・変更や見積もり</b>を変えることで利益を調整する行動である。たとえば、機械の耐用年数を五年から八年に見直して毎年の減価償却費を減らす、減価償却方法や棚卸資産の評価方法を変える、貸倒率や返品率の見積もりを変える、などがある。今年増やした利益は将来の利益の減少となって戻ってくる(期間相互間で利益が移る)。</p><p><b>実体的裁量行動</b>は、<b>実際の企業活動そのもの</b>を変えることで利益を調整する行動である。たとえば、期末の押し込み販売や出荷の延期、研究開発費や広告宣伝費の支出の削減、含み益のある有価証券や固定資産を売る時期の選択などがある。お金の動きも実際に変わり、広告や研究開発を削れば将来の売上や競争力を損なうおそれがある。</p></div><div class="qa-pts"><p>会計的=会計方法・見積もりを変える(取引は変えない)+具体例</p><p>実体的=実際の取引・支出を変える+具体例</p><p>違いの帰結(会計的は将来の利益と相殺/実体的はお金が動き将来を削る)まで書けると高得点</p></div></template></li>
+<li>標準的なボーナス・プランのもとで、経営者の利益マネジメントの戦略が利益の水準によってどう変わるかを説明しなさい。<template class="qa" data-ch="ch7" data-n="2" data-sec="ch7-5"><div class="qa-a"><p>標準的なボーナス・プランでは、利益が目標利益(下限)に届かなければボーナスはゼロ、目標を超えると下限の額から利益に比例して増え、ある水準(上限)を超えると頭打ちになる。そのため、経営者の戦略は利益の水準によって変わる。</p><p>① 利益が<b>下限の少し下〜上限の少し下</b>にあるとき:利益を少し増やせばボーナスがもらえる(増える)ので、利益を増やす<b>利益捻出型</b>をとる。</p><p>② 利益が<b>上限より上</b>にあるとき:これ以上増やしてもボーナスは増えないので、余った利益を来期に回す<b>利益圧縮型</b>をとる。</p><p>③ 利益が<b>下限よりかなり下</b>にあるとき:どうせ今年のボーナスはゼロなので、損失や費用を今年にまとめて計上し、来期以降の利益を出しやすくする<b>利益圧縮型(ビッグバス)</b>をとる。</p><p>①と②は、利益をボーナスが増える範囲に収めようとする動きなので、<b>利益平準化</b>ともいえる。</p></div><div class="qa-pts"><p>ボーナス・プランの形(下限未満はゼロ・比例して増える・上限で頭打ち)</p><p>三つの位置ごとの戦略(捻出/圧縮/ビッグバス)を理由つきで書いている</p><p>捻出と圧縮が利益平準化にあたることに触れている</p></div></template></li>
 </ol>
 </div>
 </section>
@@ -1874,11 +1947,11 @@ body.listening .foot{display:none}
 <details class="ans"><summary>答えと手順</summary><p>ＴＡ ＝ 300－220 ＝ <b>80</b>、ＤＡ ＝ 80－50 ＝ <b>30</b></p></details></div>
 
 <h3 id="ap-3">章別キーワード一覧</h3>
-<p>用語だけを並べました。一つずつ、自分の言葉で説明できるか確かめてください。</p>
-<div class="yoko box"><table><tr><th>章</th><th>キーワード</th></tr><tr><td class="nw">第一章</td><td>ビジネスの言語／貸借対照表／損益計算書／売上総利益／営業利益／経常利益／税金等調整前当期純利益／当期純利益／利害関係者／契約の集合体／意思決定支援機能／利害調整機能／実数分析／比率分析／構成比分析／関係比分析／趨勢比分析／時系列分析／クロスセクション分析／相対業績評価／決算短信／業績予想修正／資本コスト／ＥＤＩＮＥＴ／ＥＤＧＡＲ／ＩＲ／非財務情報／ＥＳＧ／利益マネジメント／粉飾／経済的帰結／収斂／全面適用／実証会計研究／反証可能</td></tr><tr><td class="nw">第二章</td><td>キャッシュ・フロー計算書／信用取引／設備投資／一致の原則／支払能力／資金繰り／客観性／連結キャッシュ・フロー計算書／営業活動によるキャッシュ・フロー／投資活動によるキャッシュ・フロー／財務活動によるキャッシュ・フロー／直接法／間接法／税金等調整前当期純利益／非キャッシュ損益項目／減価償却費／減損損失／引当金／運転資本／小計／表示区分／経営パターン／ライフサイクル／対角線</td></tr><tr><td class="nw">第三章</td><td>営業ＣＦマージン／自己資本営業ＣＦ比率／営業ＣＦ対流動負債比率／債務償還年数／有利子負債／営業ＣＦ対利払率／インタレスト・カバレッジ・レシオ／設備投資比率／正味設備投資額／投資ＣＦ対営業ＣＦ比率／フリー・キャッシュ・フロー／企業価値評価／間便法／ＮＯＰＬＡＴ／ＥＢＩＴ／ＣＡＰＥＸ／増加運転資本</td></tr><tr><td class="nw">第四章</td><td>業績の推移／成長性分析／前期比／趨勢比／ベース年度／年平均成長率／幾何平均／算術平均／売上高成長率／増収率／ベンチマーク／セグメント情報／生産、受注及び販売の状況／受注残高／使用総資本／内部留保／サステイナブル成長率／ＲＯＥ／配当性向／利益の質／利益の持続性／研究開発投資／情報の非対称性／設備の状況／従業員の状況／平均勤続年数／決算短信／経営者予想／予想の改訂／上方修正／下方修正／ＩＲカレンダー／ポートフォリオ／中央値／平均回帰</td></tr><tr><td class="nw">第五章</td><td>付加価値／経営資源／控除法／加算法／人件費／賃借料／金融費用／減価償却費／税金／税引後利益／粗付加価値／労働生産性／付加価値率／従業員一人当たり売上高／労働分配率／一人当たり人件費</td></tr><tr><td class="nw">第六章</td><td>経済的付加価値(ＥＶＡ)／税引後営業利益／期首投下資本／資本コスト／価値犠牲／割引率／切捨率／時間的価値／借入／社債／新株の発行／利益の留保／機会損失／リスクマネー／有限責任／加重平均資本コスト(ＷＡＣＣ)／資本構成／負債コスト／株主資本コスト／節税効果／実効税率／ＣＡＰＭ／リスクフリー・レート／市場ポートフォリオ／β</td></tr><tr><td class="nw">第七章</td><td>会計利益の質／発生主義会計／見積もり／恣意性／ノイズ／利益マネジメント／利益調整／利益数値制御／粉飾／機会主義的選択／効率的選択(効率的契約)／情報提供的選択／会計的裁量行動／実体的裁量行動／押し込み販売／表示区分シフティング／期間相互間／同一期間内／利益捻出型／利益圧縮型／利益平準化／ボーナス・プラン／目標利益／ビッグバス／財務制限条項／新規株式公開／マネジメント・バイアウト／政治的コスト／経営者交代／会計発生高／総会計発生高／裁量的会計発生高／非裁量的会計発生高／利益の分布テスト</td></tr></table></div>
+<p>用語だけを並べました。一つずつ、自分の言葉で説明できるか確かめてください。思い出せない言葉は、押すとその言葉が出てくる本文のページへ飛べます。</p>
+<div class="yoko box"><table><tr><th>章</th><th>キーワード</th></tr><tr><td class="nw">第一章</td><td class="kwcell" data-ch="ch1">ビジネスの言語／貸借対照表／損益計算書／売上総利益／営業利益／経常利益／税金等調整前当期純利益／当期純利益／利害関係者／契約の集合体／意思決定支援機能／利害調整機能／実数分析／比率分析／構成比分析／関係比分析／趨勢比分析／時系列分析／クロスセクション分析／相対業績評価／決算短信／業績予想修正／資本コスト／ＥＤＩＮＥＴ／ＥＤＧＡＲ／ＩＲ／非財務情報／ＥＳＧ／利益マネジメント／粉飾／経済的帰結／収斂／全面適用／実証会計研究／反証可能</td></tr><tr><td class="nw">第二章</td><td class="kwcell" data-ch="ch2">キャッシュ・フロー計算書／信用取引／設備投資／一致の原則／支払能力／資金繰り／客観性／連結キャッシュ・フロー計算書／営業活動によるキャッシュ・フロー／投資活動によるキャッシュ・フロー／財務活動によるキャッシュ・フロー／直接法／間接法／税金等調整前当期純利益／非キャッシュ損益項目／減価償却費／減損損失／引当金／運転資本／小計／表示区分／経営パターン／ライフサイクル／対角線</td></tr><tr><td class="nw">第三章</td><td class="kwcell" data-ch="ch3">営業ＣＦマージン／自己資本営業ＣＦ比率／営業ＣＦ対流動負債比率／債務償還年数／有利子負債／営業ＣＦ対利払率／インタレスト・カバレッジ・レシオ／設備投資比率／正味設備投資額／投資ＣＦ対営業ＣＦ比率／フリー・キャッシュ・フロー／企業価値評価／間便法／ＮＯＰＬＡＴ／ＥＢＩＴ／ＣＡＰＥＸ／増加運転資本</td></tr><tr><td class="nw">第四章</td><td class="kwcell" data-ch="ch4">業績の推移／成長性分析／前期比／趨勢比／ベース年度／年平均成長率／幾何平均／算術平均／売上高成長率／増収率／ベンチマーク／セグメント情報／生産、受注及び販売の状況／受注残高／使用総資本／内部留保／サステイナブル成長率／ＲＯＥ／配当性向／利益の質／利益の持続性／研究開発投資／情報の非対称性／設備の状況／従業員の状況／平均勤続年数／決算短信／経営者予想／予想の改訂／上方修正／下方修正／ＩＲカレンダー／ポートフォリオ／中央値／平均回帰</td></tr><tr><td class="nw">第五章</td><td class="kwcell" data-ch="ch5">付加価値／経営資源／控除法／加算法／人件費／賃借料／金融費用／減価償却費／税金／税引後利益／粗付加価値／労働生産性／付加価値率／従業員一人当たり売上高／労働分配率／一人当たり人件費</td></tr><tr><td class="nw">第六章</td><td class="kwcell" data-ch="ch6">経済的付加価値(ＥＶＡ)／税引後営業利益／期首投下資本／資本コスト／価値犠牲／割引率／切捨率／時間的価値／借入／社債／新株の発行／利益の留保／機会損失／リスクマネー／有限責任／加重平均資本コスト(ＷＡＣＣ)／資本構成／負債コスト／株主資本コスト／節税効果／実効税率／ＣＡＰＭ／リスクフリー・レート／市場ポートフォリオ／β</td></tr><tr><td class="nw">第七章</td><td class="kwcell" data-ch="ch7">会計利益の質／発生主義会計／見積もり／恣意性／ノイズ／利益マネジメント／利益調整／利益数値制御／粉飾／機会主義的選択／効率的選択(効率的契約)／情報提供的選択／会計的裁量行動／実体的裁量行動／押し込み販売／表示区分シフティング／期間相互間／同一期間内／利益捻出型／利益圧縮型／利益平準化／ボーナス・プラン／目標利益／ビッグバス／財務制限条項／新規株式公開／マネジメント・バイアウト／政治的コスト／経営者交代／会計発生高／総会計発生高／裁量的会計発生高／非裁量的会計発生高／利益の分布テスト</td></tr></table></div>
 <h3 id="ap-4">想定問題一覧</h3>
-<p>各章の終わりに置いた問いを集めました。どれも「原因と結果」「違いと理由」をセットで答える形です。</p>
-<div class="yoko box"><table><tr><th>章</th><th>問い</th></tr><tr><td class="nw">第一章</td><td>財務諸表の「意思決定支援機能」と「利害調整機能」の違いを、利害関係者を一人選んで具体的に説明しなさい。</td></tr><tr><td class="nw">第一章</td><td>利益マネジメントとは何か。粉飾とどう違うか、また経営者が利益を調整しようとする理由とあわせて説明しなさい。</td></tr><tr><td class="nw">第二章</td><td>会計利益とキャッシュ・フローがずれる原因を二つあげ、それでも全期間では両者が一致する理由を説明しなさい。</td></tr><tr><td class="nw">第二章</td><td>営業ＣＦ＋・投資ＣＦ－・財務ＣＦ－の会社と、営業ＣＦ－・投資ＣＦ＋・財務ＣＦ＋の会社は、それぞれどのような状態だと読めるか。</td></tr><tr><td class="nw">第三章</td><td>フリー・キャッシュ・フローとは何か。二つの算定方法を示し、ＦＣＦがマイナスの会社をどう評価すべきか述べなさい。</td></tr><tr><td class="nw">第四章</td><td>年平均成長率を求めるとき、各年の前期比を単純に平均してはいけないのはなぜか。具体的な数値例を使って説明しなさい。</td></tr><tr><td class="nw">第四章</td><td>上場企業を売上高成長率で十のグループに分けて追跡すると、どのような傾向が見られるか。その現象の名前と、分析をするうえでの教訓を述べなさい。</td></tr><tr><td class="nw">第五章</td><td>付加価値の控除法と加算法を説明し、加算法の各項目がそれぞれだれへの分配にあたるかを述べなさい。</td></tr><tr><td class="nw">第五章</td><td>ある会社の労働分配率が前の年より上がった。考えられる原因を、分解式を使って二つ述べなさい。</td></tr><tr><td class="nw">第六章</td><td>株主資本コストが負債コストより高くなるのはなぜか。また、利益の留保(内部留保)にもコストがあると言えるのはなぜか。</td></tr><tr><td class="nw">第六章</td><td>黒字の会社でも経済的付加価値(ＥＶＡ)がマイナスになることがある。その理由を、資本コストの考え方を使って説明しなさい。</td></tr><tr><td class="nw">第七章</td><td>会計的裁量行動と実体的裁量行動の違いを、それぞれ具体例をあげて説明しなさい。</td></tr><tr><td class="nw">第七章</td><td>標準的なボーナス・プランのもとで、経営者の利益マネジメントの戦略が利益の水準によってどう変わるかを説明しなさい。</td></tr></table></div>
+<p>各章の終わりに置いた問いを集めました。どれも「原因と結果」「違いと理由」をセットで答える形です。まず自分で答えを考え(書き出せればなおよい)、それから「回答例」を開いて見比べてください。</p>
+<div class="yoko box"><table><tr><th>章</th><th>問い</th></tr><tr><td class="nw">第一章</td><td class="qcell">財務諸表の「意思決定支援機能」と「利害調整機能」の違いを、利害関係者を一人選んで具体的に説明しなさい。<template class="qa" data-ch="ch1" data-n="1" data-sec="ch1-3"><div class="qa-a"><p><b>意思決定支援機能</b>は、契約を結ぶ<b>前</b>に「この相手と契約してよいか」を判断するために財務諸表を使う働きであり、<b>利害調整機能</b>は、契約を結んだ<b>あと</b>に、約束が守られているか、経営者が自分たちに不利な行動をしていないかを確かめる働きである。</p><p>たとえば銀行(債権者)の場合、融資の前には財務諸表から返済能力や安全性を読み、貸すかどうか、どんな条件で貸すかを決める(意思決定支援機能)。融資のあとには、毎期の財務諸表で、貸したお金と利息を回収できそうか、約束した条件が守られているかを見張る(利害調整機能)。</p><p>会社はさまざまな利害関係者との「契約の集合体」であり、同じ財務諸表が、契約の前と後で異なる役割を果たしているのである。</p></div><div class="qa-pts"><p>契約の「前」=意思決定支援/「後」=利害調整、と時点で区別している</p><p>利害関係者を一人に決めて、前と後それぞれの具体的な使い方を書いている</p><p>会社は利害関係者との「契約の集合体」という前提に触れている</p></div></template></td></tr><tr><td class="nw">第一章</td><td class="qcell">利益マネジメントとは何か。粉飾とどう違うか、また経営者が利益を調整しようとする理由とあわせて説明しなさい。<template class="qa" data-ch="ch1" data-n="2" data-sec="ch1-6"><div class="qa-a"><p><b>利益マネジメント</b>とは、会計ルールで認められた複数の会計方法や見積もりの<b>選択の幅</b>を使って、経営者が報告する利益を調整することである。たとえば、機械の減価償却の方法や耐用年数の選び方によって、毎年の費用と利益の額は変わる。</p><p>あくまで<b>ルールの範囲内</b>の行動である点で、ルールを破って利益を偽る<b>粉飾</b>とは区別される。</p><p>経営者が利益を調整しようとするのは、会計数値の公表が、株価、経営者の報酬(ボーナス)、借入れの条件などに実際の影響を与えるからである。これを<b>経済的帰結</b>という。数字が現実を動かすので、人は数字を動かしたくなるのである。</p></div><div class="qa-pts"><p>会計方法・見積もりの選択の幅を使って利益を調整する、という定義</p><p>ルールの範囲内(利益マネジメント)/ルール違反(粉飾)の違い</p><p>理由として「経済的帰結」(株価・報酬・借入条件への影響)を書いている</p></div></template></td></tr><tr><td class="nw">第二章</td><td class="qcell">会計利益とキャッシュ・フローがずれる原因を二つあげ、それでも全期間では両者が一致する理由を説明しなさい。<template class="qa" data-ch="ch2" data-n="1" data-sec="ch2-2"><div class="qa-a"><p>ずれる原因の一つめは<b>信用取引</b>である。掛けで売り買いをすると、売上や費用は取引をしたときに計上されるが、お金が動くのはあとになる。</p><p>二つめは<b>設備投資</b>である。機械を買うとお金は買った年にまとめて出ていくが、利益の計算では<b>減価償却</b>によって、使う年数に分けて少しずつ費用にする(例:一千万円の機械を五年で償却すれば、毎年二百万円の費用)。</p><p>どちらも、収益・費用を記録する<b>時期</b>と、お金が動く<b>時期</b>の違いにすぎない。掛けの代金はいずれ回収され、機械の代金も耐用年数を通じてすべて費用になる。だから会社が生まれてから終わるまでの<b>全期間</b>を合計すれば、利益の合計とキャッシュ・フローの合計は等しくなる(<b>一致の原則</b>)。ただし会社の存続は途中の一年一年の資金繰りで決まるので、キャッシュ・フロー計算書が必要になる。</p></div><div class="qa-pts"><p>原因①信用取引(計上とお金の受払いの時期のずれ)</p><p>原因②設備投資(一度に支出/減価償却で分けて費用)</p><p>どちらも「時期」の違いなので全期間では一致する(一致の原則)</p></div></template></td></tr><tr><td class="nw">第二章</td><td class="qcell">営業ＣＦ＋・投資ＣＦ－・財務ＣＦ－の会社と、営業ＣＦ－・投資ＣＦ＋・財務ＣＦ＋の会社は、それぞれどのような状態だと読めるか。<template class="qa" data-ch="ch2" data-n="2" data-sec="ch2-6"><div class="qa-a"><p><b>営業ＣＦ＋・投資ＣＦ－・財務ＣＦ－</b>の会社は、本業で稼いだお金で新しい投資をまかない、さらに借入金の返済など有利子負債の圧縮もできている状態である。もっとも望ましい経営パターンで、ライフサイクルでいえば<b>成熟期</b>にあたる。</p><p><b>営業ＣＦ－・投資ＣＦ＋・財務ＣＦ＋</b>の会社は、本業でお金を稼げず、土地や設備、有価証券などの資産を売ったり(投資ＣＦがプラス)、借入れなどでお金を集めたり(財務ＣＦがプラス)して、手元のお金を保っている状態である。営業活動が不振で、この状態が続けば成長の鈍化による<b>倒産の危険性</b>が高まる(<b>衰退期</b>)。</p></div><div class="qa-pts"><p>前者:稼いだお金で投資し借金も返している=最も望ましい(成熟期)</p><p>後者:本業不振を資産の売却と資金調達で補っている(衰退期)</p><p>それぞれの符号の意味(投資ＣＦ＋=資産売却、財務ＣＦ－=返済)を説明している</p></div></template></td></tr><tr><td class="nw">第三章</td><td class="qcell">フリー・キャッシュ・フローとは何か。二つの算定方法を示し、ＦＣＦがマイナスの会社をどう評価すべきか述べなさい。<template class="qa" data-ch="ch3" data-n="1" data-sec="ch3-4"><div class="qa-a"><p><b>フリー・キャッシュ・フロー(ＦＣＦ)</b>とは、本業で得た正味のキャッシュ・インフローから、法人税等と、事業を続けるために必要な設備投資を差し引いた、会社が<b>自由に使えるお金</b>である。借入金の返済、株主への配当、新しい事業への投資に使えるため、経営成果の判断基準や企業価値評価に使われる。</p><p>算定方法は二つある。</p><p>① ＦＣＦ ＝ <b>営業ＣＦ ＋ 投資ＣＦ</b><br>② ＦＣＦ ＝ <b>営業ＣＦの小計 － 法人税等の支払額 － 正味設備投資額</b>(設備の取得のための支出－売却収入)</p><p>ＦＣＦがマイナスだからといって、すぐに悪い会社とは言えない。将来の成長のために大きな設備投資をした年なのか(例:三越伊勢丹は営業ＣＦの小計約七十億円に対し、二百九十億円を超える設備投資でＦＣＦは約マイナス二百六十五億円)、それとも本業がお金を生まなくなっているのかを、営業ＣＦの水準や投資の中身、数年の推移から見極める必要がある。</p></div><div class="qa-pts"><p>定義:本業のお金－法人税等－設備投資=自由に使えるお金</p><p>算定方法を二つとも式で書いている(営業ＣＦ＋投資ＣＦ/小計－法人税等－正味設備投資)</p><p>マイナスでも直ちに悪いとは言えない理由(投資のためか、本業不振か)を書いている</p></div></template></td></tr><tr><td class="nw">第四章</td><td class="qcell">年平均成長率を求めるとき、各年の前期比を単純に平均してはいけないのはなぜか。具体的な数値例を使って説明しなさい。<template class="qa" data-ch="ch4" data-n="1" data-sec="ch4-2"><div class="qa-a"><p>伸び率は、前の年の値を土台にして<b>掛け算で積み重なっていく</b>。ところが前期比を足して年数で割る<b>算術平均</b>では、割り算の土台が年ごとに変わることが無視されるため、実態とずれる(伸び率のばらつきが大きいほど高めに出る)。</p><p>たとえば売上高が 100 → 110 → 100 と動いたとする。前期比は＋10％と－9.1％(10÷110)で、算術平均は約＋0.45％になる。しかし二年たっても売上は 100 のままで、実際の伸びはゼロである。</p><p>そこで「毎年同じ率で伸びたとしたら何％か」を、何乗根を使う<b>幾何平均</b>で求める。これが<b>年平均成長率</b>で、(<sup>年数</sup>√(当期実績値÷ベース年度実績値)－１)×100 で計算する。この例では √(100÷100)－１＝0％ となり、実態と一致する。</p></div><div class="qa-pts"><p>伸び率は掛け算で積み重なる(土台が毎年変わる)ことを書いている</p><p>数値例で算術平均がずれることを示している(例:100→110→100)</p><p>幾何平均(年平均成長率)の式で正しく求められることを書いている</p></div></template></td></tr><tr><td class="nw">第四章</td><td class="qcell">上場企業を売上高成長率で十のグループに分けて追跡すると、どのような傾向が見られるか。その現象の名前と、分析をするうえでの教訓を述べなさい。<template class="qa" data-ch="ch4" data-n="2" data-sec="ch4-7"><div class="qa-a"><p>ベース年度の売上高成長率で会社を十のグループに分け、顔ぶれを変えずに追いかけると、成長率が飛び抜けて高かったグループ(中央値で二七〜二八％ほど)も、マイナスに沈んでいたグループ(－六〜七％ほど)も、<b>一年後にはほぼ同じ水準に集まり</b>、その後も似た水準に落ち着いていく。ＲＯＥで同じ分析をしても同じ傾向が見られる。</p><p>この現象を<b>平均回帰</b>という。極端に高い(低い)成長率は、大きな注文やライバルの失敗のような一時的な追い風(逆風)によることが多く、もうかる市場には競争相手も集まるためである。</p><p>分析の<b>教訓</b>は、今年の高い伸びや低い伸びを、そのまま将来に引き伸ばして予測してはいけない、ということである。数字はある程度の水準に落ち着いていくという前提で分析する必要がある。</p></div><div class="qa-pts"><p>高いグループも低いグループも同じ水準に集まる、という傾向</p><p>現象の名前「平均回帰」(ＲＯＥでも同じ)</p><p>教訓:今年の伸びを将来にそのまま引き伸ばさない</p></div></template></td></tr><tr><td class="nw">第五章</td><td class="qcell">付加価値の控除法と加算法を説明し、加算法の各項目がそれぞれだれへの分配にあたるかを述べなさい。<template class="qa" data-ch="ch5" data-n="1" data-sec="ch5-2"><div class="qa-a"><p><b>付加価値</b>とは、外部から購入した原材料・部品・サービスをもとに、企業が経済活動によって新しく生み出した価値である。</p><p><b>控除法</b>は、売上高から外部から受け入れた購入額を差し引いて求める(全体から他人の分を引く)。<b>加算法</b>は、生み出した価値の行き先を足し上げて求める。足すのは、人件費・賃借料・金融費用・減価償却費・税金・税引後利益である(調査機関の統計はほぼ加算法)。</p><p>各項目の分配先は、<b>人件費</b>は従業員へ、<b>賃借料</b>は土地や建物の貸し手へ、<b>金融費用</b>(支払利息)はお金を貸した銀行などの債権者へ、<b>税金</b>は国や地方自治体へ、<b>税引後利益</b>は株主と会社自身(内部留保)へ渡る。<b>減価償却費</b>は、価値を生み出すのに使った設備がすり減った分にあたる(減価償却費を含めたものを粗付加価値という)。</p></div><div class="qa-pts"><p>控除法=売上高－外部購入額、加算法=分配先の合計、の違い</p><p>加算法の六項目をすべて挙げている</p><p>各項目の分配先(従業員・貸し手・債権者・国・株主と会社)を対応させている</p></div></template></td></tr><tr><td class="nw">第五章</td><td class="qcell">ある会社の労働分配率が前の年より上がった。考えられる原因を、分解式を使って二つ述べなさい。<template class="qa" data-ch="ch5" data-n="2" data-sec="ch5-4"><div class="qa-a"><p>労働分配率は、分母と分子の間に従業員数をはさむと、次のように分解できる。</p><p><b>労働分配率 ＝ 人件費÷付加価値 ＝ 一人当たり人件費 ÷ 労働生産性</b></p><p>したがって、労働分配率が上がった原因は二つ考えられる。</p><p>① 分子の<b>一人当たり人件費が上がった</b>(賃上げなど、従業員への分配を手厚くした)。</p><p>② 分母の<b>労働生産性が下がった</b>(付加価値が減った、または従業員が増えたなど、稼ぐ力が落ちた)。労働生産性はさらに、付加価値率×従業員一人当たり売上高に分解して原因を探れる。</p><p>同じ「分配率の上昇」でも、①なら賃上げ、②なら稼ぐ力の低下で、意味は正反対である。たとえばサイゼリヤは、一人当たり人件費が約6％減ったのに、労働生産性がそれ以上(約7％)下がったため、労働分配率は55.3％から55.9％に上がっていた。</p></div><div class="qa-pts"><p>分解式 労働分配率=一人当たり人件費÷労働生産性 を書いている</p><p>原因①一人当たり人件費の上昇(賃上げ)</p><p>原因②労働生産性の低下(稼ぐ力の低下)。意味が正反対になることに触れている</p></div></template></td></tr><tr><td class="nw">第六章</td><td class="qcell">株主資本コストが負債コストより高くなるのはなぜか。また、利益の留保(内部留保)にもコストがあると言えるのはなぜか。<template class="qa" data-ch="ch6" data-n="1" data-sec="ch6-3"><div class="qa-a"><p>銀行などの債権者は、会社の業績にかかわらず元本と利息の返済を求めることができ、会社にとって必ず返さなければならないお金である。一方、株主が出したお金は、会社がつぶれても返すよう求めることができない。株主は会社と一緒に<b>リスクを背負っている</b>(<b>リスクマネー</b>)ため、その分、銀行の利息より高いリターン(配当や株価の上昇)を期待する。この期待するリターンが会社にとってのコストなので、<b>株主資本コストは負債コストより高くなる</b>。さらに負債の利息は費用として税金を減らす(節税効果)ので、税引後の負債コストはいっそう低くなる。</p><p><b>利益の留保</b>(内部留保)は、帳簿の上では支払いが生じないので、コストがないように見える。しかし、そのお金を配当として株主に配っていれば、株主はほかの会社に投資して利益を得られたはずである。その<b>得られたはずの利益(機会損失)</b>が、内部留保のコストである。</p></div><div class="qa-pts"><p>債権者は必ず返済を求められる/株主は返済を求められずリスクを負う(リスクマネー)</p><p>リスクを負う分、株主はより高いリターンを期待する=コストが高い</p><p>内部留保のコスト=株主が他に投資すれば得られた利益(機会損失)</p></div></template></td></tr><tr><td class="nw">第六章</td><td class="qcell">黒字の会社でも経済的付加価値(ＥＶＡ)がマイナスになることがある。その理由を、資本コストの考え方を使って説明しなさい。<template class="qa" data-ch="ch6" data-n="2" data-sec="ch6-7"><div class="qa-a"><p><b>経済的付加価値(ＥＶＡ)＝ 税引後営業利益 － 加重平均資本コスト(ＷＡＣＣ)× 期首投下資本</b></p><p>会社が事業に使うお金は、銀行から借りたものも株主から預かったものも、ただではない。お金を出した人は、利息や配当・値上がりといったリターンを期待しており、それが会社にとっての<b>資本コスト</b>(お金の値段)である。ところが会計上の利益の計算では、利息は費用になっても、<b>株主が期待するリターンは差し引かれない</b>。</p><p>そのため、税引後営業利益がプラス(黒字)でも、投下資本にＷＡＣＣを掛けた資本コストの額に届かなければ、ＥＶＡはマイナスになる。たとえば投下資本一千億円、ＷＡＣＣ4.4％なら資本コストは四十四億円で、税引後営業利益が四十億円の会社は黒字でもＥＶＡはマイナス四億円となる。これは、出資者の期待に応えられず、<b>実質的には価値を壊している</b>ことを意味する。</p></div><div class="qa-pts"><p>ＥＶＡの式(税引後営業利益－ＷＡＣＣ×期首投下資本)</p><p>会計上の利益は株主資本のコストを差し引いていない</p><p>利益が資本コストの額を下回れば黒字でもマイナス=価値を壊している(数値例があるとよい)</p></div></template></td></tr><tr><td class="nw">第七章</td><td class="qcell">会計的裁量行動と実体的裁量行動の違いを、それぞれ具体例をあげて説明しなさい。<template class="qa" data-ch="ch7" data-n="1" data-sec="ch7-4"><div class="qa-a"><p><b>会計的裁量行動</b>は、取引そのものには手をつけず、<b>会計方法の選択・変更や見積もり</b>を変えることで利益を調整する行動である。たとえば、機械の耐用年数を五年から八年に見直して毎年の減価償却費を減らす、減価償却方法や棚卸資産の評価方法を変える、貸倒率や返品率の見積もりを変える、などがある。今年増やした利益は将来の利益の減少となって戻ってくる(期間相互間で利益が移る)。</p><p><b>実体的裁量行動</b>は、<b>実際の企業活動そのもの</b>を変えることで利益を調整する行動である。たとえば、期末の押し込み販売や出荷の延期、研究開発費や広告宣伝費の支出の削減、含み益のある有価証券や固定資産を売る時期の選択などがある。お金の動きも実際に変わり、広告や研究開発を削れば将来の売上や競争力を損なうおそれがある。</p></div><div class="qa-pts"><p>会計的=会計方法・見積もりを変える(取引は変えない)+具体例</p><p>実体的=実際の取引・支出を変える+具体例</p><p>違いの帰結(会計的は将来の利益と相殺/実体的はお金が動き将来を削る)まで書けると高得点</p></div></template></td></tr><tr><td class="nw">第七章</td><td class="qcell">標準的なボーナス・プランのもとで、経営者の利益マネジメントの戦略が利益の水準によってどう変わるかを説明しなさい。<template class="qa" data-ch="ch7" data-n="2" data-sec="ch7-5"><div class="qa-a"><p>標準的なボーナス・プランでは、利益が目標利益(下限)に届かなければボーナスはゼロ、目標を超えると下限の額から利益に比例して増え、ある水準(上限)を超えると頭打ちになる。そのため、経営者の戦略は利益の水準によって変わる。</p><p>① 利益が<b>下限の少し下〜上限の少し下</b>にあるとき:利益を少し増やせばボーナスがもらえる(増える)ので、利益を増やす<b>利益捻出型</b>をとる。</p><p>② 利益が<b>上限より上</b>にあるとき:これ以上増やしてもボーナスは増えないので、余った利益を来期に回す<b>利益圧縮型</b>をとる。</p><p>③ 利益が<b>下限よりかなり下</b>にあるとき:どうせ今年のボーナスはゼロなので、損失や費用を今年にまとめて計上し、来期以降の利益を出しやすくする<b>利益圧縮型(ビッグバス)</b>をとる。</p><p>①と②は、利益をボーナスが増える範囲に収めようとする動きなので、<b>利益平準化</b>ともいえる。</p></div><div class="qa-pts"><p>ボーナス・プランの形(下限未満はゼロ・比例して増える・上限で頭打ち)</p><p>三つの位置ごとの戦略(捻出/圧縮/ビッグバス)を理由つきで書いている</p><p>捻出と圧縮が利益平準化にあたることに触れている</p></div></template></td></tr></table></div>
 
 <h3 id="ap-5">注意して読む箇所の一覧</h3>
 <p>本文に印をつけた箇所を集めました。［補足］は資料に書かれていないことを補った箇所、［要確認］は推定で書いた箇所、［講義］は講義動画で先生が口頭で補足した箇所です。試験の直前に、ここだけ見返してください。</p>
@@ -1907,8 +1980,10 @@ body.listening .foot{display:none}
 const BOOK_ID = "keiei2-2026";
 const SB_URL = "https://gzayrjlhruhvklsidraw.supabase.co";
 const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6YXlyamxocnVodmtsc2lkcmF3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyNDM0NTksImV4cCI6MjEwMDgxOTQ1OX0.ZXaigzh2qWs1yK_CJkW9BYvN4s4Cl8p1adHu6ZcqSPU";
-const LS_KEY = "shinsho:" + BOOK_ID;
-const LS_PREF = "shinsho:pref";
+// 試し読み(動作確認用):URL に ?sandbox を付けると、同期せず、端末の記録も本番と別の場所に置く
+const SANDBOX = /[?&]sandbox\b/.test(location.search);
+const LS_KEY = "shinsho:" + BOOK_ID + (SANDBOX ? ":sandbox" : "");
+const LS_PREF = "shinsho:pref" + (SANDBOX ? ":sandbox" : "");
 const DEVICE = (() => { const u = navigator.userAgent; if (/iPad/.test(u) || (/Macintosh/.test(u) && navigator.maxTouchPoints > 1)) return "iPad"; if (/iPhone/.test(u)) return "iPhone"; if (/Android/.test(u)) return "Android"; return "パソコン"; })();
 
 /* ===== 状態(1項目1キー、tsが新しい方が勝つ) ===== */
@@ -1935,6 +2010,7 @@ const syncEl = document.getElementById("sync"), syncTxt = document.getElementByI
 function syncStatus(kind, text) { syncEl.className = "sync " + kind; syncTxt.textContent = text; }
 function schedulePush() { clearTimeout(pushTimer); pushTimer = setTimeout(push, 1500); }
 async function sb(path, body) {
+  if (SANDBOX) return body ? null : [];
   const r = await fetch(SB_URL + path, { method: body ? "POST" : "GET", headers: { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY, "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
   if (!r.ok) throw new Error(r.status + " " + await r.text());
   return r.json();
@@ -1951,6 +2027,7 @@ async function pull() {
   return changed;
 }
 async function push() {
+  if (SANDBOX) return;
   const dirty = Object.entries(store.items).filter(([, it]) => it.dirty);
   if (!dirty.length) return;
   if (!navigator.onLine) { syncStatus("off", "オフライン。記録は端末に保存し、つながったら送ります"); return; }
@@ -1963,13 +2040,14 @@ async function push() {
   } catch (e) { syncStatus("off", "同期できませんでした。記録は端末に残っています"); }
 }
 async function syncAll(reason) {
+  if (SANDBOX) { syncStatus("", "試し読み(同期しません)"); return; }
   if (syncing) return; syncing = true;
   try {
     if (!navigator.onLine) { syncStatus("off", "オフライン。端末に保存した内容で読めます"); return; }
     const changed = await pull();
     await push();
     syncStatus("ok", "同期ずみ " + new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }));
-    if (changed) { renderHome(); if (reason === "resume") maybeOfferRemote(); }
+    if (changed) { applyFsColors(); renderHome(); if (reason === "resume") maybeOfferRemote(); }
   } catch (e) { syncStatus("off", "同期できませんでした。端末に保存した内容で読めます"); }
   finally { syncing = false; }
 }
@@ -2064,11 +2142,16 @@ const page = document.getElementById("page");
 let cur = null, ready = false, seenStart = new Set();
 const maxScroll = () => Math.max(1, page.scrollWidth - page.clientWidth);
 const getP = () => Math.min(1, Math.abs(page.scrollLeft) / maxScroll());
-const setP = p => { page.scrollLeft = -p * maxScroll(); if (Math.abs(page.scrollLeft) < 1 && p > 0) page.scrollLeft = p * maxScroll(); };
+// ページの位置はこのアプリだけが動かす(指で払うのも、プログラムでめくる)。own() は「いまの位置の変化は自分で動かした」という印。
+// 印のない位置の変化(答えを開いた・印をつけた・入力欄に触れたなどで、ブラウザが勝手に動かしたもの)は、元のページに戻す
+let ownUntil = 0;
+const own = ms => { ownUntil = Math.max(ownUntil, Date.now() + (ms || 150)); };
+const setP = p => { own(); page.scrollLeft = -p * maxScroll(); if (Math.abs(page.scrollLeft) < 1 && p > 0) page.scrollLeft = p * maxScroll(); };
+let ro = null, roW = 0, pendingRelayout = false, placeOff = -1;
 
-function openChapter(id, p, secId) {
+function openChapter(id, p, secId, onReady) {
   const c = chapters.find(x => x.id === id); if (!c) return;
-  cur = c; ready = false; seenStart = new Set();
+  cur = c; ready = false; seenStart = new Set(); placeOff = -1;
   document.getElementById("home").hidden = true; document.getElementById("reader").hidden = false;
   page.innerHTML = ""; const clone = c.el.cloneNode(true); clone.removeAttribute("id"); page.append(clone);
   // 章末:チェック欄と「読了」「次の章」
@@ -2097,10 +2180,19 @@ function openChapter(id, p, secId) {
   if (nfs) { const fb = document.createElement("button"); fb.className = "next-btn fs-btn"; fb.textContent = `この章の付箋を振り返る(${nfs}枚)`; fb.onclick = () => openReview({ ch: c.id, card: true }); tail.append(fb); }
   if (chapters[idx + 1]) { const nb = document.createElement("button"); nb.className = "next-btn"; nb.textContent = "次の章へ　" + chapters[idx + 1].title + "(このままページをめくっても進めます)"; nb.onclick = () => openChapter(chapters[idx + 1].id, 0); tail.append(nb); }
   clone.append(tail);
+  setupKeywords(clone, c.id);
+  setupQA(clone);
   tcy(clone);
   paintHighlights(clone, c.id);
   paintFusen(clone, c.id);
   lastPage = -1; hideSelTool();
+  // 章の長さが変わったら(図の読み込み・答えを開くなど)、いま読んでいる文字の位置を保ったままページ割りを作り直す
+  if (ro) ro.disconnect();
+  if (window.ResizeObserver) {
+    roW = 0;
+    ro = new ResizeObserver(ents => { const w = ents[0].contentRect.width; if (!ready || !roW) { roW = w; return; } if (Math.abs(w - roW) < 1) return; roW = w; scheduleRelayout(); });
+    ro.observe(clone);
+  }
   // 巻末の一覧(タグの付いた箇所)を組み立てる
   const tl = clone.querySelector("#taglist-slot"); if (tl) buildTagList(tl);
   document.getElementById("ttl").textContent = c.title;
@@ -2108,15 +2200,194 @@ function openChapter(id, p, secId) {
   document.getElementById("markdone").textContent = stateOf(c.id) === "done" ? "読了ずみ" : "読了にする";
   document.body.classList.add("reading-calm");
   afterLayout(() => {
+    if (cur !== c) return;
     pages = []; buildPages();
-    if (secId) { const h = clone.querySelector("#" + CSS.escape(secId)); if (h) scrollToEl(h); }
-    else setP(p == null ? ((get("pos:" + c.id) || {}).p || 0) : p);
-    alignLine();
+    if (updateKwNumbers()) { pages = []; buildPages(); }
+    const h = secId && clone.querySelector("#" + CSS.escape(secId));
+    if (h) goToEl(h); else { setP(p == null ? ((get("pos:" + c.id) || {}).p || 0) : p); alignLine(); }
     ready = true; onScroll();
     if (stateOf(c.id) === "unread") set("st:" + c.id, "reading");
+    updateMarkBar(); showBackChip();
+    if (onReady) onReady();
   });
   try { history.replaceState(null, "", "#" + c.id); } catch (e) {}
 }
+// その章を開いてから(開いていればすぐ)fn を動かす
+function withChapter(chId, fn) { if (cur && cur.id === chId && ready) fn(); else openChapter(chId, null, null, fn); }
+// 要素のあるページへ(ページの区切りどおりに)
+function goToEl(el, smooth) {
+  if (!el || !cur) return; if (!pages.length) buildPages();
+  const r = el.getClientRects()[0] || el.getBoundingClientRect();
+  goPage(pageOfX((r.left + r.right) / 2 + page.scrollLeft), smooth); onScroll();
+}
+// 本文の通し番号 off の文字があるページへ
+function goToOff(off, smooth) {
+  if (!cur) return; if (!pages.length) buildPages();
+  const i = pageOfOff(off); if (i >= 0) { goPage(i, smooth); onScroll(); }
+}
+function pageOfX(xc) { for (let i = 0; i < pages.length; i++) if (xc >= pages[i].cut - 1) return i; return pages.length - 1; }
+function pageOfOff(off, ft) {
+  ft = ft || flatText(page.querySelector(".chapter") || page);
+  let b = null; for (let d = 0; d < 60 && !b && off + d < ft.text.length; d++) b = charRect(ft, off + d);
+  return b ? pageOfX((b.left + b.right) / 2 + page.scrollLeft) : -1;
+}
+// いま読んでいるページの最初の文字を覚えておく(文字の大きさや画面の大きさが変わっても、この文字のページに戻る)
+const sheetOpen = () => [...document.querySelectorAll(".sheet")].some(s => !s.hidden);
+function notePlace() { if (!cur || !ready || sheetOpen()) return; const r = pageTextRange(); if (r) placeOff = r.s; }
+let rlTimer;
+function scheduleRelayout() { if (sheetOpen()) { pendingRelayout = true; return; } clearTimeout(rlTimer); rlTimer = setTimeout(relayoutKeep, 60); }
+function relayoutKeep() {
+  if (!cur || !ready) return;
+  pendingRelayout = false;
+  const off = placeOff;
+  pages = []; buildPages();
+  if (updateKwNumbers()) { pages = []; buildPages(); }
+  if (off >= 0) goToOff(off, false); else { alignLine(); onScroll(); }
+}
+
+/* ===== 考えてみよう:回答例(章末と巻末の想定問題一覧) =====
+   記録:「qa:章-番号」= { my(自分の答え), seen(回答例を開いた時刻), ok:[書けた要点の番号] }。端末間で同期する */
+function setupQA(root) {
+  root.querySelectorAll("template.qa").forEach(t => {
+    const b = document.createElement("button"); b.type = "button"; b.className = "qa-btn";
+    const key = `qa:${t.dataset.ch}-${t.dataset.n}`, rec = get(key) || {};
+    b.textContent = rec.seen ? `回答例をもう一度${(rec.ok || []).length ? `(${rec.ok.length}点)` : ""}` : "考えてから、回答例を見る";
+    b.classList.toggle("seen", !!rec.seen);
+    b.onclick = e => { e.stopPropagation(); openQA(t, b); };
+    t.after(b);
+  });
+}
+let qaCur = null, qaSaveT;
+function openQA(t, btn) {
+  const key = `qa:${t.dataset.ch}-${t.dataset.n}`, rec = Object.assign({ my: "", seen: 0, ok: [] }, get(key) || {});
+  const host = t.parentElement.cloneNode(true); host.querySelectorAll("template,button").forEach(x => x.remove());
+  const c = chOf(t.dataset.ch);
+  qaCur = { key, t, btn, ch: t.dataset.ch, sec: t.dataset.sec };
+  document.getElementById("qa-h").textContent = `考えてみよう(${c ? c.no : ""} 問${t.dataset.n})`;
+  document.getElementById("qa-q").textContent = host.textContent.trim();
+  document.getElementById("qa-my").value = rec.my || "";
+  const frag = t.content.cloneNode(true);
+  const ans = document.getElementById("qa-ans"); ans.innerHTML = ""; ans.append(frag.querySelector(".qa-a") || "");
+  const pts = document.getElementById("qa-pts"); pts.innerHTML = "";
+  [...frag.querySelectorAll(".qa-pts p")].forEach((li, i) => {
+    const lab = document.createElement("label"); const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = (rec.ok || []).includes(i);
+    cb.onchange = () => { const r = Object.assign({ my: "", seen: Date.now(), ok: [] }, get(key) || {}); const ok = new Set(r.ok || []); cb.checked ? ok.add(i) : ok.delete(i); set(key, { ...r, ok: [...ok].sort() }); qaHint(); };
+    const sp = document.createElement("span"); sp.innerHTML = li.innerHTML; lab.append(cb, sp); pts.append(lab);
+  });
+  showQA(!!rec.seen); qaHint();
+  openSheet("sh-qa");
+}
+function showQA(open) {
+  document.getElementById("qa-body").hidden = !open;
+  document.getElementById("qa-openrow").hidden = open;
+}
+function qaHint() {
+  if (!qaCur) return;
+  const r = get(qaCur.key) || {}, n = document.querySelectorAll("#qa-pts input").length, k = (r.ok || []).length;
+  const c = chOf(qaCur.ch), s = c && c.secs.find(x => x.id === qaCur.sec);
+  document.getElementById("qa-hint").textContent = !k ? `回答例と見比べて、書けていた要点にチェックしましょう。足りなかったところは「本文で確かめる」で${s ? `「${s.title}」` : "本文"}へ。`
+    : k >= n ? "全部の要点が書けました。本番でもこの順で書けば大丈夫です。" : `${n}点中${k}点。足りなかった要点は、${s ? `「${s.title}」` : "本文"}で確かめておきましょう。`;
+  if (qaCur.btn) {
+    const txt = r.seen ? `回答例をもう一度${k ? `(${k}点)` : ""}` : "考えてから、回答例を見る";
+    if (qaCur.btn.textContent !== txt) { qaCur.btn.textContent = txt; scheduleRelayout(); }
+    qaCur.btn.classList.toggle("seen", !!r.seen);
+  }
+}
+document.getElementById("qa-my").addEventListener("input", e => {
+  clearTimeout(qaSaveT); const v = e.target.value, key = qaCur && qaCur.key; if (!key) return;
+  qaSaveT = setTimeout(() => set(key, Object.assign({ my: "", seen: 0, ok: [] }, get(key) || {}, { my: v })), 500);
+});
+document.getElementById("qa-open").onclick = () => {
+  if (!qaCur) return;
+  const r = Object.assign({ my: "", seen: 0, ok: [] }, get(qaCur.key) || {}, { my: document.getElementById("qa-my").value });
+  set(qaCur.key, { ...r, seen: Date.now() }); showQA(true); qaHint();
+  document.getElementById("qa-ans").scrollIntoView({ block: "start", behavior: "smooth" });
+};
+document.getElementById("qa-hide").onclick = () => showQA(false);
+document.getElementById("qa-go").onclick = () => {
+  if (!qaCur) return; const { ch, sec } = qaCur; closeSheets();
+  rememberSpot("問い");
+  withChapter(ch, () => { const h = page.querySelector("#" + CSS.escape(sec)); if (h) goToEl(h); });
+};
+
+/* ===== キーワード:押すと、その言葉が出てくる本文のページへ =====
+   章末のキーワードには、その言葉が初めて(太字で説明されている所を優先)出てくるページの番号を小さく添える */
+function setupKeywords(root, chId) {
+  root.querySelectorAll(".end .kw").forEach(el => {
+    const h = el.previousElementSibling;
+    if (h && h.classList.contains("end-h") && !h.querySelector(".kw-note")) { const n = document.createElement("span"); n.className = "kw-note"; n.textContent = "(小さな数字は出てくるページ。押すとそこへ)"; h.append(n); }
+  });
+  root.querySelectorAll(".end .kw, td.kwcell").forEach(el => {
+    const ch = el.dataset.ch || chId;
+    const words = el.textContent.split("／"); el.textContent = "";
+    words.forEach((w, i) => {
+      if (i) el.append("／");
+      const s = document.createElement("span"); s.className = "kwi"; s.dataset.kw = w.trim(); s.dataset.ch = ch; s.textContent = w; el.append(s);
+    });
+  });
+}
+function kwOffset(root, ft, word) {
+  const end = root.querySelector(".end"), endOff = end ? firstTextOff(ft, end) : ft.text.length;
+  const vs = [word, word.replace(/[(（][^)）]*[)）]/g, ""), ...(word.match(/[(（]([^)）]+)[)）]/) || []).slice(1)].map(v => v.trim()).filter(v => v.length >= 1);
+  const inEnd = el => el.closest(".end,.tail");
+  for (const v of vs) for (const b of root.querySelectorAll("b")) {
+    if (inEnd(b)) continue; const i = b.textContent.indexOf(v);
+    if (i >= 0) { const o = firstTextOff(ft, b); if (o >= 0) return o + i; }
+  }
+  for (const v of vs) { const i = ft.text.indexOf(v); if (i >= 0 && i < endOff) return i; }
+  // 本文では「業績予想の修正」のように「の」や空白をはさんでいることがある
+  for (const v of vs) {
+    if (v.length < 3) continue;
+    const re = new RegExp([...v].map(ch => ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("[の\\s]?"));
+    const m = re.exec(ft.text); if (m && m.index < endOff) return m.index;
+  }
+  return -1;
+}
+// 章末のキーワードにページ番号を添える。番号が変わったら true(ページ割りの作り直しが要る)
+function updateKwNumbers() {
+  if (!cur) return false;
+  const root = page.querySelector(".chapter") || page; const kws = [...root.querySelectorAll(".end .kwi")]; if (!kws.length) return false;
+  const ft = flatText(root); let changed = false;
+  for (const k of kws) {
+    const off = kwOffset(root, ft, k.dataset.kw), pg = off >= 0 ? pageOfOff(off, ft) : -1;
+    const txt = pg >= 0 ? String(pg + 1) : "";
+    let n = k.querySelector(".kwp");
+    if (!txt) { if (n) { n.remove(); changed = true; } continue; }
+    if (!n) { n = document.createElement("span"); n.className = "kwp tcy"; k.append(n); }
+    if (n.textContent !== txt) { n.textContent = txt; changed = true; }
+  }
+  return changed;
+}
+function jumpToKeyword(chId, word) {
+  rememberSpot("キーワード");
+  withChapter(chId, () => {
+    const root = page.querySelector(".chapter") || page, ft = flatText(root), off = kwOffset(root, ft, word);
+    if (off < 0) { toast(`「${word}」は本文に見つかりませんでした`); return; }
+    goToOff(off, false); flashRange(off, off + (ft.text.slice(off).startsWith(word) ? word.length : word.replace(/[(（][^)）]*[)）]/g, "").length));
+    toast(`「${word}」が出てくるページです`);
+  });
+}
+function flashRange(s, e) {
+  const root = page.querySelector(".chapter") || page, ft = flatText(root);
+  const els = wrapRange(ft, s, e, () => { const m = document.createElement("mark"); m.className = "find"; return m; });
+  setTimeout(() => els.forEach(m => m.isConnected && m.replaceWith(...m.childNodes)), 5000);
+}
+
+/* ===== 飛んだあと、元の場所へ戻る札 ===== */
+let backSpot = null;
+const backChip = document.getElementById("backchip");
+function rememberSpot(label) {
+  if (!cur || !ready) return;
+  const r = pageTextRange(); backSpot = { ch: cur.id, off: r ? r.s : 0, label, at: Date.now() };
+}
+function showBackChip() {
+  const ok = backSpot && cur && !(backSpot.ch === cur.id && Math.abs(pageIdx - (pageOfOff(backSpot.off))) === 0);
+  backChip.hidden = !ok; if (ok) backChip.textContent = `← ${backSpot.label}の場所へ戻る` + (backSpot.ch !== cur.id ? `(${chOf(backSpot.ch).no || chOf(backSpot.ch).title})` : "");
+}
+backChip.onclick = () => {
+  const b = backSpot; backSpot = null; backChip.hidden = true; if (!b) return;
+  withChapter(b.ch, () => goToOff(b.off, false));
+};
 // 描き終わってから動かす。画面が裏に回っていると描画の合図が来ないので、少し待っても来なければそのまま進める
 function afterLayout(fn) {
   let done = false; const run = () => { if (!done) { done = true; fn(); } };
@@ -2125,12 +2396,13 @@ function afterLayout(fn) {
 // 縦書きでは scrollIntoView の向きの指定が横書きと逆になるので、要素の右端が本文の右端に来るよう自分で動かす
 function scrollToEl(el) {
   const pr = page.getBoundingClientRect(), g = gutter(), r = el.getBoundingClientRect();
-  page.scrollLeft += r.right - (pr.right - g.r) + 2;
+  own(); page.scrollLeft += r.right - (pr.right - g.r) + 2;
 }
 function closeReader() {
   savePos(true); cur = null; document.getElementById("pagetab").hidden = true;
+  backSpot = null; backChip.hidden = true; document.getElementById("markbar").hidden = true; hideSelTool();
   document.getElementById("reader").hidden = true; document.getElementById("home").hidden = false;
-  try { history.replaceState(null, "", location.pathname); } catch (e) {}
+  try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
   renderHome();
 }
 let posTimer = null;
@@ -2171,7 +2443,13 @@ function onScroll() {
   savePos(false); markSections();
   if (p > 0.995 && stateOf(cur.id) !== "done") { set("st:" + cur.id, "done"); document.getElementById("markdone").textContent = "読了ずみ"; toast("この章を読み終えました"); }
 }
-page.addEventListener("scroll", onScroll, { passive: true });
+page.addEventListener("scroll", () => {
+  // 自分で動かしていないのに位置が変わったら(ブラウザが勝手に章の頭などへ動かした)、いまのページに戻す
+  if (ready && pages.length && Date.now() > ownUntil && pages[pageIdx] && Math.abs(page.scrollLeft - pages[pageIdx].s) > 2) {
+    own(); page.scrollLeft = pages[pageIdx].s; return;
+  }
+  onScroll();
+}, { passive: true });
 
 // ページ送り:左側タップ=次(縦書きは左へ進む)、右側タップ=前、真ん中=帯を出す
 const gutter = () => { const cs = getComputedStyle(page); return { l: parseFloat(cs.paddingLeft), r: parseFloat(cs.paddingRight) }; };
@@ -2218,7 +2496,7 @@ function pageAt(sl) { let best = 0; pages.forEach((pg, i) => { if (Math.abs(pg.s
 function applyCover() {
   const gl = document.querySelector(".gut.l"), pg = pages[pageIdx]; gl.style.width = "";
   if (!pg) return;
-  setTimeout(updatePageTab, 0);
+  setTimeout(() => { updatePageTab(); notePlace(); if (backSpot) showBackChip(); updateMarkBar(); }, 0);
   const pr = page.getBoundingClientRect(), g = gutter();
   const x = pg.cut - page.scrollLeft - pr.left; // 隠す境目(画面の x、左端から)
   if (x > g.l && x < pr.width * 0.95) gl.style.width = Math.ceil(x) + "px";
@@ -2227,11 +2505,13 @@ function goPage(i, smooth) {
   if (!pages.length) buildPages();
   pageIdx = Math.max(0, Math.min(pages.length - 1, i));
   const anim = smooth && pref.anim !== 0 && !matchMedia("(prefers-reduced-motion: reduce)").matches;
+  own(anim ? 900 : 150);
   page.scrollTo({ left: pages[pageIdx].s, behavior: anim ? "smooth" : "auto" });
   if (!anim) applyCover();
 }
 function turn(dir) {
   if (!pages.length) buildPages();
+  if (MM) { markTurn(dir); return; }
   const i = pageAt(page.scrollLeft) + (dir > 0 ? 1 : -1);
   // 章の最後のページでさらにめくると次の章の頭へ、最初のページで戻ると前の章の終わりへ(紙の本と同じく、そのまま続けて読める)
   if (i >= pages.length || i < 0) {
@@ -2247,15 +2527,29 @@ function turn(dir) {
 // 位置を指定したあと(章を開いた・節へ飛んだ・設定を変えた)、いちばん近いページの区切りにそろえる
 // いまの位置を含むページ(読む順で、その位置の手前から始まるページ)
 function pageFor(t) { let best = -1; pages.forEach((pg, i) => { if (pg.s >= t - 1 && (best < 0 || pg.s < pages[best].s)) best = i; }); return best < 0 ? 0 : best; }
-function alignLine() { if (!cur) return; if (!pages.length) buildPages(); pageIdx = pageFor(page.scrollLeft); if (Math.abs(pages[pageIdx].s - page.scrollLeft) > 1) page.scrollLeft = pages[pageIdx].s; applyCover(); }
+function alignLine() { if (!cur) return; if (!pages.length) buildPages(); pageIdx = pageFor(page.scrollLeft); if (Math.abs(pages[pageIdx].s - page.scrollLeft) > 1) { own(); page.scrollLeft = pages[pageIdx].s; } applyCover(); }
 let endTimer;
 page.addEventListener("scroll", () => { clearTimeout(endTimer); endTimer = setTimeout(() => { pageIdx = pageAt(page.scrollLeft); applyCover(); }, 120); }, { passive: true });
+// 文字を選んでいる最中(または選んだ直後)に触れたときは、ページをめくらない(選択を外すだけ)。画面の端で付箋をはろうとしてめくれてしまうのを防ぐ
+let downHadSel = false, toolPressAt = 0;
+function noteDown() {
+  const s = getSelection();
+  downHadSel = !selTool.hidden || (s && !s.isCollapsed && page.contains(s.anchorNode)) || !!(lp && lp.sel && (lp.down || Date.now() < lp.until)) || Date.now() - toolPressAt < 600;
+}
+page.addEventListener("pointerdown", noteDown, true);
+page.addEventListener("touchstart", noteDown, { passive: true, capture: true });
 page.addEventListener("click", e => {
   if (suppressClick) { suppressClick = false; return; }
   if (e.target.closest("button,input,label,summary,a,details")) return;
   if (getSelection && String(getSelection()).length) return;
+  if (downHadSel) { downHadSel = false; hideSelTool(); return; }
+  // キーワードを押したら、その言葉が出てくるページへ
+  const kw = e.target.closest(".kwi"); if (kw) { jumpToKeyword(kw.dataset.ch, kw.dataset.kw); return; }
+  // 付箋を押したら、その付箋の編集(重なっていれば選ぶ)
+  const fms = []; for (let n = e.target.closest("mark.fs"); n; n = n.parentElement && n.parentElement.closest("mark.fs")) if (!fms.includes(n.dataset.id)) fms.push(n.dataset.id);
+  if (fms.length === 1) { editFusen(fms[0]); return; }
+  if (fms.length > 1) { pickFusen(fms, e.clientX, e.clientY); return; }
   // マーカーを押したら、色とメモの編集
-  const fm = e.target.closest("mark.fs"); if (fm) { editFusen(fm.dataset.id); return; }
   const mk = e.target.closest("mark.hl"); if (mk) { editHighlight(mk.dataset.id); return; }
   // 右上の角を押したら、しおり(Kindle と同じ場所)
   if (e.clientX > innerWidth - 60 && e.clientY < 80) { toggleBookmark(); return; }
@@ -2268,7 +2562,7 @@ document.addEventListener("keydown", e => {
   else if (e.key === "ArrowRight" || e.key === "PageUp") { e.preventDefault(); turn(-1); }
   else if (e.key === "Escape") closeReader();
 });
-document.getElementById("seek").addEventListener("input", e => setP(e.target.value / 1000));
+document.getElementById("seek").addEventListener("input", e => { setP(e.target.value / 1000); alignLine(); });
 document.getElementById("back").onclick = closeReader;
 document.getElementById("markdone").onclick = () => { if (!cur) return; set("st:" + cur.id, "done"); document.getElementById("markdone").textContent = "読了ずみ"; toast("読了にしました"); };
 document.getElementById("prevch").onclick = () => { const i = chapters.indexOf(cur); if (i > 0) openChapter(chapters[i - 1].id, null); };
@@ -2298,16 +2592,23 @@ function applyPref() {
   try { localStorage.setItem(LS_PREF, JSON.stringify(pref)); } catch (e) {}
 }
 // 設定を変えても、読んでいた場所(章の中の割合)を保つ
-function changePref(fn) { const p = cur ? getP() : 0; fn(); applyPref(); if (cur) afterLayout(() => { pages = []; buildPages(); setP(p); alignLine(); onScroll(); }); }
+// 設定を変えても、読んでいたページの最初の文字があるページに戻る
+function changePref(fn) { fn(); applyPref(); if (cur) afterLayout(relayoutKeep); }
 document.getElementById("aa-fs-").onclick = () => changePref(() => { pref.fs = Math.max(-3, pref.fs - 1); });
 document.getElementById("aa-fs+").onclick = () => changePref(() => { pref.fs = Math.min(8, pref.fs + 1); });
 for (const [id, key, num] of [["aa-font", "font", false], ["aa-lh", "lh", true], ["aa-mx", "mx", true], ["aa-theme", "theme", false], ["aa-anim", "anim", true]])
   document.querySelectorAll(`#${id} button`).forEach(b => b.onclick = () => changePref(() => { pref[key] = num ? +b.dataset.v : b.dataset.v; }));
-let rz; window.addEventListener("resize", () => { const p = cur ? getP() : 0; clearTimeout(rz); rz = setTimeout(() => { applyPref(); if (cur) afterLayout(() => { pages = []; buildPages(); setP(p); alignLine(); onScroll(); }); }, 150); });
+// 画面の大きさが変わったとき。入力欄に文字を打っている間(キーボードが出て画面が縮んだとき)は組み直さず、閉じてから組み直す
+let rz; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { if (sheetOpen()) { pendingRelayout = true; return; } applyPref(); if (cur) afterLayout(relayoutKeep); }, 150); });
 
 /* ===== 引き出し(Aa・ノート・検索・マーカー編集) ===== */
-function openSheet(id) { document.querySelectorAll(".sheet").forEach(s => s.hidden = s.id !== id); hideSelTool(); }
-function closeSheets() { document.querySelectorAll(".sheet").forEach(s => s.hidden = true); }
+function openSheet(id) { notePlace(); document.querySelectorAll(".sheet").forEach(s => s.hidden = s.id !== id); hideSelTool(); }
+function closeSheets() {
+  document.querySelectorAll(".sheet").forEach(s => s.hidden = true);
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  // 引き出しを開いている間に画面の大きさが変わっていたら、閉じたあとで(キーボードが引っこむのを待って)読んでいた所に戻す
+  if (cur && pendingRelayout) setTimeout(() => { if (sheetOpen()) return; applyPref(); afterLayout(relayoutKeep); }, 350);
+}
 document.querySelectorAll(".sheet").forEach(s => s.addEventListener("click", e => { if (e.target === s || e.target.closest("[data-close]")) closeSheets(); }));
 ["h-aa", "r-aa"].forEach(id => document.getElementById(id).onclick = () => openSheet("sh-aa"));
 ["h-notes", "r-notes"].forEach(id => document.getElementById(id).onclick = () => { renderNotebook(); openSheet("sh-nb"); });
@@ -2320,7 +2621,8 @@ let touch0 = null;
 page.addEventListener("touchstart", e => { if (e.touches.length === 1) touch0 = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() }; }, { passive: true });
 page.addEventListener("touchend", e => {
   if (!touch0) return; const t = e.changedTouches[0]; const dx = t.clientX - touch0.x, dy = t.clientY - touch0.y; const dt = Date.now() - touch0.t; touch0 = null;
-  if (String(getSelection()).length) return;
+  // 文字を選んでいるとき・長押しで用語を選んだときは、指が横に動いてもめくらない(選ぶ範囲のつまみを動かしているため)
+  if (String(getSelection()).length || downHadSel || (lp && lp.sel)) return;
   // 縦書きの本は右から左へ進むので、指を右へ払うと次のページ(紙の本をめくる向き)
   if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.2 && dt < 800) { suppressClick = true; setTimeout(() => { suppressClick = false; }, 400); turn(dx > 0 ? 1 : -1); }
 }, { passive: true });
@@ -2362,7 +2664,7 @@ const allOf = prefix => Object.keys(store.items).filter(k => k.startsWith(prefix
 // 本文の文字を一続きにして、どの文字がどのテキストノードのどこにあるかを覚える(図・章末のチェック・ボタンは除く)
 function flatText(root) {
   const nodes = []; let text = "";
-  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: n => n.parentElement.closest("svg,.tail,.checks,button,.end-h") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: n => n.parentElement.closest("svg,.tail,.checks,button,.end-h,.kwp,template") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
   while (w.nextNode()) { nodes.push({ n: w.currentNode, s: text.length }); text += w.currentNode.nodeValue; }
   return { text, nodes };
 }
@@ -2409,12 +2711,20 @@ const selTool = document.getElementById("seltool");
 let selTimer, selSnap = null;
 // 道具を押しても、選んだ文字が外れないように(パソコン)
 selTool.addEventListener("mousedown", e => e.preventDefault());
+// 道具に指が触れた瞬間に端末が選択を外しても、道具を消さない(押した操作がちゃんと届くように)
+selTool.addEventListener("pointerdown", () => { toolPressAt = Date.now(); });
+selTool.addEventListener("touchstart", () => { toolPressAt = Date.now(); }, { passive: true });
 function hideSelTool() { selTool.hidden = true; }
+let extending = false;
 document.addEventListener("selectionchange", () => {
   clearTimeout(selTimer);
   selTimer = setTimeout(() => {
     const sel = getSelection();
-    if (!cur || !sel.rangeCount || sel.isCollapsed || !page.contains(sel.anchorNode)) { hideSelTool(); selSnap = null; return; }
+    if (extending) return;
+    if (!cur || !sel.rangeCount || sel.isCollapsed || !page.contains(sel.anchorNode)) {
+      if (Date.now() - toolPressAt < 1500 && selSnap) return;
+      hideSelTool(); selSnap = null; return;
+    }
     const r = sel.getRangeAt(0).getBoundingClientRect(); if (!r.width && !r.height) { hideSelTool(); selSnap = null; return; }
     // いま選んでいる範囲を覚えておく(道具を押した瞬間に端末が選択を外しても、付箋やマーカーをつけられるように)
     selSnap = selAnchor();
@@ -2442,8 +2752,34 @@ function saveSelection(color, withNote) {
 selTool.querySelectorAll(".dot").forEach(b => b.onclick = () => saveSelection(b.dataset.c, false));
 document.getElementById("st-note").onclick = () => saveSelection("y", true);
 document.getElementById("st-copy").onclick = async () => {
-  const t = String(getSelection()); try { await navigator.clipboard.writeText(t); toast("コピーしました"); } catch (e) { toast("コピーできませんでした"); }
-  hideSelTool();
+  const a = curSel(); const t = (a && a.q) || String(getSelection()).trim();
+  if (!t) { toast("コピーする文字を、もう一度選んでください"); return; }
+  let ok = false;
+  try { await navigator.clipboard.writeText(t); ok = true; } catch (e) {
+    const ta = document.createElement("textarea"); ta.value = t; ta.setAttribute("readonly", ""); ta.style.cssText = "position:fixed;top:0;left:0;opacity:0";
+    document.body.append(ta); ta.select(); try { ok = document.execCommand("copy"); } catch (e2) {} ta.remove();
+  }
+  toast(ok ? `コピーしました(${t.replace(/\s+/g, "").length}字)` : "コピーできませんでした");
+  getSelection().removeAllRanges(); selSnap = null; hideSelTool();
+};
+// 選ぶ範囲を、ページをまたいで次のページまでのばす。始まりはそのまま、終わりを次のページの最初の文の終わりに置く(あとは端末のつまみで調整できる)
+document.getElementById("st-ext").onclick = () => {
+  const a = curSel(); if (!a || !cur) { toast("先に、のばしたい範囲の始まりを長押しで選んでください"); return; }
+  if (!pages.length) buildPages();
+  const i = pageAt(page.scrollLeft) + 1;
+  if (i >= pages.length) { toast("この章の最後のページです(章をまたいでは選べません)"); return; }
+  extending = true; const start = a.s;
+  goPage(i, false);
+  afterLayout(() => {
+    const r = pageTextRange();
+    if (!r) { extending = false; return; }
+    const head = r.ft.text.slice(r.s, Math.min(r.e, r.s + 80)), m = head.search(/[。」]/);
+    const end = m >= 0 ? r.s + m + 1 : Math.min(r.e, r.s + 24);
+    selectFlat(r.ft, start, end);
+    selSnap = anchorOf(r.root, r.ft, start, end);
+    setTimeout(() => { extending = false; document.dispatchEvent(new Event("selectionchange")); }, 50);
+    toast(`前のページから続けて選びました(${selSnap ? selSnap.q.replace(/\s+/g, "").length : 0}字)。終わりはつまみで調整、さらにのばすなら「次ページへ」`);
+  });
 };
 // マーカーの色・メモの編集
 let editing = null;
@@ -2491,10 +2827,26 @@ document.getElementById("r-bm").onclick = toggleBookmark;
 
 /* ===== 付箋(あとで振り返るための印。マーカーとは別) =====
    記録:「fs:id」= { ch, q(選んだ文字), pre/post(前後の文字), at, sec(節), kind, note(自分への問い), done(わかった), n(振り返った回数), rv(最後に振り返った時刻), made }
-   kind:q=わからない/m=覚える/e=試験に出そう。はがしたら { del: 1 }。端末間で同期する */
-const FSK = { q: "わからない", m: "覚える", e: "試験に出そう" };
-const FS_ASK = { q: "ここ、いまなら自分の言葉で説明できる?", m: "本を見ないで言える?", e: "試験で聞かれたら答えられる?" };
-const FS_ASK_PG = { q: "このページに書いてあったこと、いまなら説明できる?", m: "このページの要点を、本を見ないで言える?", e: "このページから出題されたら答えられる?" };
+   kind:q=わからない/m=覚える・試験に出そう/i=興味深い(古い e=試験に出そう は m にまとめた)。はがしたら { del: 1 }。端末間で同期する
+   色は「fscol」= { q, m, i }(種類ごと。端末間で同期) */
+const FSK = { q: "わからない", m: "覚える・試験に出そう", i: "興味深い" };
+const kindOf = f => { const k = f && f.kind; return k === "e" ? "m" : FSK[k] ? k : "q"; };
+const FS_ASK = { q: "ここ、いまなら自分の言葉で説明できる?", m: "本を見ないで言える? 試験で聞かれたら答えられる?", i: "どこが面白かったか、ひとことで人に話せる?" };
+const FS_ASK_PG = { q: "このページに書いてあったこと、いまなら説明できる?", m: "このページの要点を、本を見ないで言える?", i: "このページの面白かったところ、人に話せる?" };
+const PAL = ["#d9604c", "#e08a2e", "#c9a400", "#3f9a5a", "#2f9fb5", "#4f8fd1", "#8e6bbf", "#d1679a", "#8a7a66"];
+const FS_DEF = { q: "#d9604c", m: "#4f8fd1", i: "#3f9a5a" };
+const fsColors = () => Object.assign({}, FS_DEF, get("fscol") || {});
+function applyFsColors() { const c = fsColors(); for (const k in FS_DEF) document.documentElement.style.setProperty("--fs-" + k, c[k]); }
+function renderPalette(kind) {
+  const box = document.getElementById("fs-pal"); box.innerHTML = ""; const now = fsColors()[kind];
+  document.getElementById("fs-q").style.setProperty("--hlc", now);
+  document.getElementById("fs-colh").textContent = `「${FSK[kind]}」の色(この種類の付箋がすべてこの色になります)`;
+  for (const col of PAL) {
+    const b = document.createElement("button"); b.style.background = col; b.setAttribute("aria-label", "色 " + col); b.classList.toggle("on", col === now);
+    b.onclick = () => { set("fscol", { ...fsColors(), [kind]: col }); applyFsColors(); renderPalette(kind); };
+    box.append(b);
+  }
+}
 const firstTextOff = (ft, el) => { const t = document.createTreeWalker(el, NodeFilter.SHOW_TEXT).nextNode(); return t ? offsetOf(ft, t, 0) : -1; };
 function selAnchor() {
   const sel = getSelection(); if (!cur || !sel.rangeCount || sel.isCollapsed) return null;
@@ -2636,18 +2988,38 @@ document.addEventListener("selectionchange", () => {
 // 長押しで出る端末のメニュー(Android の右クリック相当)は出さない。代わりに下の道具を使う
 page.addEventListener("contextmenu", e => { if (lp && lp.sel) e.preventDefault(); });
 
-function fsMark(key, f) { const m = document.createElement("mark"); m.className = `fs k-${f.kind || "q"}` + (f.done ? " done" : ""); m.dataset.id = key; return m; }
+function fsMark(key, f) { const m = document.createElement("mark"); m.className = `fs k-${kindOf(f)}` + (f.done ? " done" : ""); m.dataset.id = key; return m; }
+// 付箋を文字に塗る。いくつ重なってもよい(同じ文字に何枚でも)。書き始めの1か所にだけ小さな帯をつける
+function wrapFs(root, key, f) {
+  const ft = flatText(root); const s = findAnchor(ft.text, f); if (s < 0) return [];
+  const els = wrapRange(ft, s, s + f.q.length, () => fsMark(key, f));
+  if (els[0]) els[0].classList.add("first");
+  return els;
+}
 function paintFusen(root, chId) {
   pageFsCache = null;
-  for (const f of allOf("fs:").filter(f => f.ch === chId && !f.pg)) {
-    const ft = flatText(root); const s = findAnchor(ft.text, f);
-    if (s >= 0) wrapRange(ft, s, s + f.q.length, () => fsMark(f.key, f));
-  }
+  for (const f of allOf("fs:").filter(f => f.ch === chId && !f.pg)) wrapFs(root, f.key, f);
 }
 function repaintFs(key) {
   const f = live(key);
-  page.querySelectorAll(`mark.fs[data-id="${CSS.escape(key)}"]`).forEach(m => { if (!f) m.replaceWith(...m.childNodes); else m.className = fsMark(key, f).className; });
+  page.querySelectorAll(`mark.fs[data-id="${CSS.escape(key)}"]`).forEach((m, i) => { if (!f) m.replaceWith(...m.childNodes); else m.className = fsMark(key, f).className + (i === 0 ? " first" : ""); });
   pageFsCache = null; updatePageTab();
+}
+// 重なった付箋・同じページの付箋から、どれを開くか選ぶ
+function pickFusen(keys, x, y, extra) {
+  document.querySelectorAll(".menu-pop").forEach(m => m.remove());
+  const m = document.createElement("div"); m.className = "menu-pop";
+  for (const k of keys) {
+    const f = live(k); if (!f) continue;
+    const b = document.createElement("button"); b.className = `k-${kindOf(f)}`;
+    const chip = document.createElement("span"); chip.className = "fs-chip" + (f.done ? " done" : ""); chip.textContent = f.done ? "わかった" : FSK[kindOf(f)];
+    const sm = document.createElement("small"); const t = (f.note || f.q).replace(/\s+/g, ""); sm.textContent = t.length > 34 ? t.slice(0, 34) + "…" : t;
+    b.append(chip, sm); b.onclick = () => { m.remove(); editFusen(k); }; m.append(b);
+  }
+  if (extra) { const b = document.createElement("button"); b.innerHTML = `${extra.label}<small></small>`; b.querySelector("small").textContent = extra.small || ""; b.onclick = () => { m.remove(); extra.fn(); }; m.append(b); }
+  document.body.append(m);
+  m.style.top = Math.max(8, Math.min(innerHeight - m.offsetHeight - 8, y)) + "px"; m.style.left = Math.max(8, Math.min(innerWidth - m.offsetWidth - 8, x - m.offsetWidth / 2)) + "px";
+  setTimeout(() => document.addEventListener("click", function off(e) { if (!m.contains(e.target)) { m.remove(); if (page.contains(e.target)) { e.stopPropagation(); e.preventDefault(); } } document.removeEventListener("click", off, true); }, true), 0);
 }
 
 /* ===== ページ全体の付箋 =====
@@ -2679,18 +3051,22 @@ function updatePageTab() {
   const here = cur ? pageFsHere() : [];
   tab.hidden = !here.length; if (!here.length) return;
   const f = here.find(x => !x.done) || here[0];
-  tab.className = `pagetab k-${f.kind || "q"}` + (f.done ? " done" : "");
+  tab.className = `pagetab k-${kindOf(f)}` + (f.done ? " done" : "");
   tab.textContent = here.length > 1 ? `付箋${here.length}` : "付箋";
-  tab.onclick = () => editFusen(f.key);
+  tab.onclick = e => {
+    if (here.length === 1) { editFusen(f.key); return; }
+    const r = tab.getBoundingClientRect();
+    pickFusen(here.map(x => x.key), r.left + r.width / 2 + 60, r.bottom + 6, { label: "このページにもう1枚はる", fn: pinPage });
+  };
 }
+// ページ全体の付箋。1ページに何枚でもはれる
 function pinPage() {
   const r = pageTextRange(); const a = r && anchorOf(r.root, r.ft, r.s, r.e);
   if (!a) { toast("このページには付箋をはれません"); return; }
-  const dup = pageFsHere()[0]; if (dup) { editFusen(dup.key); toast("このページにはもう付箋があります"); return; }
   // そのページにある節の見出し(振り返るときの手がかりにする)
   const hd = [...r.root.querySelectorAll("h3[id]")].filter(h => { const o = firstTextOff(r.ft, h); return o >= r.s && o < r.e; }).map(h => h.textContent.trim());
   fsPending = { ...a, pg: 1, hd }; fsEditing = null; hideSelTool();
-  showFsSheet({ q: a.q, pg: 1, sec: a.sec, ch: cur.id, kind: pref.fsk || "q", note: "" }, false);
+  showFsSheet({ q: a.q, pg: 1, sec: a.sec, ch: cur.id, kind: kindOf({ kind: pref.fsk }), note: "" }, false);
 }
 const pagePreview = f => { const t = f.q.replace(/\s+/g, ""); return `このページ全体(約${t.length}字)\n${t.slice(0, 60)}…`; };
 // 付箋ボタン(読書中の上の帯):このページにはる/振り返る
@@ -2700,32 +3076,34 @@ function fsMenu(btn) {
   const open = allOf("fs:").filter(f => !f.done).length, here = cur ? allOf("fs:").filter(f => f.ch === cur.id && !f.done).length : 0;
   const a = document.createElement("button"); a.innerHTML = "このページに付箋をはる<small>ページ全体をあとで振り返る</small>"; a.onclick = () => { m.remove(); pinPage(); };
   const b = document.createElement("button"); b.innerHTML = "付箋で振り返る<small></small>"; b.querySelector("small").textContent = open ? `まだ ${open}枚` + (here ? `(この章 ${here}枚)` : "") : "まだ付箋はありません"; b.onclick = () => { m.remove(); openReview({}); };
-  const tip = document.createElement("button"); tip.disabled = true; tip.style.cssText = "font-size:12px;color:var(--ink-soft);cursor:default"; tip.textContent = "言葉にはるときは、本文を長押し";
-  m.append(a, b, tip); document.body.append(m);
+  const c = document.createElement("button"); c.innerHTML = MM ? "ふつうに読む<small>しるしのページだけ読むのをやめる</small>" : "しるしのページだけ読む<small>付箋・マーカーをつけたページを次々に</small>"; c.onclick = () => { m.remove(); if (MM) stopMarks(); else openMarkSheet(); };
+  const tip = document.createElement("button"); tip.disabled = true; tip.style.cssText = "font-size:12px;color:var(--ink-soft);cursor:default"; tip.textContent = "言葉にはるときは、本文を長押し(何枚でも・ページをまたいでも)";
+  m.append(a, b, c, tip); document.body.append(m);
   const r = btn.getBoundingClientRect();
   m.style.top = (r.bottom + 6) + "px"; m.style.left = Math.max(8, Math.min(innerWidth - m.offsetWidth - 8, r.right - m.offsetWidth)) + "px";
-  setTimeout(() => document.addEventListener("click", function off(e) { if (!m.contains(e.target)) { m.remove(); document.removeEventListener("click", off, true); } }, true), 0);
+  setTimeout(() => document.addEventListener("click", function off(e) { if (!m.contains(e.target)) { m.remove(); if (page.contains(e.target)) { e.stopPropagation(); e.preventDefault(); } } document.removeEventListener("click", off, true); }, true), 0);
 }
 
 let fsPending = null, fsEditing = null;
 function showFsSheet(f, existing) {
-  document.getElementById("fs-h").textContent = f.pg ? (existing ? `ページの付箋(${FSK[f.kind || "q"]})` : "このページに付箋をはる") : existing ? `付箋(${FSK[f.kind || "q"]})` : "付箋をはる";
+  document.getElementById("fs-h").textContent = f.pg ? (existing ? `ページの付箋(${FSK[kindOf(f)]})` : "このページに付箋をはる") : existing ? `付箋(${FSK[kindOf(f)]})` : "付箋をはる";
   document.getElementById("fs-q").textContent = f.pg ? pagePreview(f) : f.q;
   document.getElementById("fs-q").style.whiteSpace = f.pg ? "pre-wrap" : "";
   document.getElementById("fs-note").value = f.note || "";
-  document.querySelectorAll("#fs-kind button").forEach(b => b.classList.toggle("on", b.dataset.v === (f.kind || "q")));
+  document.querySelectorAll("#fs-kind button").forEach(b => b.classList.toggle("on", b.dataset.v === kindOf(f)));
   document.getElementById("fs-save").textContent = existing ? "保存" : "はる";
   const d = document.getElementById("fs-done"); d.hidden = !existing; d.textContent = f.done ? "まだ不安(戻す)" : "わかった";
   document.getElementById("fs-del").hidden = !existing;
+  renderPalette(kindOf(f));
   openSheet("sh-fs");
 }
 function editFusen(key) { const f = live(key); if (!f) return; fsEditing = key; fsPending = null; showFsSheet(f, true); }
 document.getElementById("st-fs").onclick = () => {
   const a = curSel(); if (!a) { toast("付箋をはる文字を、もう一度長押しで選んでください"); return; }
   fsPending = a; fsEditing = null; getSelection().removeAllRanges(); selSnap = null; hideSelTool();
-  showFsSheet({ q: a.q, kind: pref.fsk || "q", note: "" }, false);
+  showFsSheet({ q: a.q, kind: kindOf({ kind: pref.fsk }), note: "" }, false);
 };
-document.querySelectorAll("#fs-kind button").forEach(b => b.onclick = () => document.querySelectorAll("#fs-kind button").forEach(x => x.classList.toggle("on", x === b)));
+document.querySelectorAll("#fs-kind button").forEach(b => b.onclick = () => { document.querySelectorAll("#fs-kind button").forEach(x => x.classList.toggle("on", x === b)); renderPalette(b.dataset.v); });
 const fsKindSel = () => { const b = document.querySelector("#fs-kind button.on"); return b ? b.dataset.v : "q"; };
 const afterFsChange = () => { if (!document.getElementById("home").hidden) renderHome(); };
 document.getElementById("fs-save").onclick = () => {
@@ -2737,7 +3115,7 @@ document.getElementById("fs-save").onclick = () => {
     const f = { ch: cur.id, q: a.q, pre: a.pre, post: a.post, at: a.s, sec: a.sec, kind, note, done: false, n: 0, rv: 0, made: Date.now() };
     if (a.pg) { f.pg = 1; if (a.hd && a.hd.length) f.hd = a.hd; }
     set(key, f);
-    if (!f.pg) { const root = page.querySelector(".chapter") || page; const ft = flatText(root); const s = findAnchor(ft.text, f); if (s >= 0) wrapRange(ft, s, s + f.q.length, () => fsMark(key, f)); }
+    if (!f.pg) wrapFs(page.querySelector(".chapter") || page, key, f);
     pageFsCache = null; updatePageTab();
     closeSheets(); toast(f.pg ? `このページに「${FSK[kind]}」の付箋をはりました` : `「${FSK[kind]}」の付箋をはりました`);
     return;
@@ -2754,11 +3132,11 @@ document.getElementById("fs-done").onclick = () => {
 document.getElementById("fs-del").onclick = () => { set(fsEditing, { del: 1 }); repaintFs(fsEditing); closeSheets(); afterFsChange(); toast("付箋をはがしました"); };
 
 // 振り返り:一覧と、1枚ずつめくるカード
-let rv = { ch: "", show: "open", card: false, queue: [], i: 0, ok: 0, again: 0 };
+let rv = { ch: "", show: "open", kind: "", card: false, queue: [], i: 0, ok: 0, again: 0 };
 const bookOrder = id => chapters.findIndex(c => c.id === id);
-function fsScope() { return allOf("fs:").filter(f => chOf(f.ch) && (!rv.ch || f.ch === rv.ch)); }
+function fsScope() { return allOf("fs:").filter(f => chOf(f.ch) && (!rv.ch || f.ch === rv.ch) && (!rv.kind || kindOf(f) === rv.kind)); }
 function openReview(o) {
-  rv = { ch: o.ch || "", show: "open", card: false, queue: [], i: 0, ok: 0, again: 0 };
+  rv = { ch: o.ch || "", show: "open", kind: o.kind || "", card: false, queue: [], i: 0, ok: 0, again: 0 };
   if (o.card) startCards(); else renderReview();
   openSheet("sh-rv");
 }
@@ -2796,11 +3174,11 @@ function renderReview() {
       box.append(p, row); return;
     }
     const c = chOf(f.ch);
-    const card = document.createElement("div"); card.className = `fs-card k-${f.kind || "q"}`;
+    const card = document.createElement("div"); card.className = `fs-card k-${kindOf(f)}`;
     const w = document.createElement("div"); w.className = "w";
-    const chip = document.createElement("span"); chip.className = "fs-chip"; chip.textContent = FSK[f.kind || "q"];
+    const chip = document.createElement("span"); chip.className = "fs-chip"; chip.textContent = FSK[kindOf(f)];
     w.append(chip, `　${f.pg ? "ページ　" : ""}${c.no}　${secTitle(f) || c.title}`);
-    const ask = document.createElement("div"); ask.className = "ask"; ask.textContent = f.note || (f.pg ? FS_ASK_PG : FS_ASK)[f.kind || "q"];
+    const ask = document.createElement("div"); ask.className = "ask"; ask.textContent = f.note || (f.pg ? FS_ASK_PG : FS_ASK)[kindOf(f)];
     const cnt = document.createElement("div"); cnt.className = "cnt"; cnt.textContent = `${rv.i + 1} / ${rv.queue.length}枚` + (f.n ? `・これまでに ${f.n}回 振り返った` : "・はじめて振り返る");
     const row = document.createElement("div"); row.className = "btnrow";
     const ok = document.createElement("button"); ok.className = "main"; ok.textContent = "わかった";
@@ -2808,11 +3186,11 @@ function renderReview() {
     const ag = document.createElement("button"); ag.textContent = "まだ(また出す)";
     ag.onclick = () => { set(key, { ...f, n: (f.n || 0) + 1, rv: Date.now() }); rv.again++; rv.i++; renderReview(); };
     const op = document.createElement("button"); op.textContent = "本で確かめる";
-    op.onclick = () => { closeSheets(); jumpToFs(f.ch, key); toast("読み終えたら、上の「付箋」から続きを振り返れます"); };
+    op.onclick = () => { closeSheets(); rememberSpot("ここまで読んでいた"); jumpToFs(f.ch, key); toast("読み終えたら、上の「付箋」から続きを振り返れます"); };
     if (f.pg) {
       // ページの付箋:「わからない」はページの文章をそのまま出す。「覚える」「試験に出そう」は書き出しだけ見せて、思い出してから全文を開く
       const body = document.createElement("div"); body.className = "pg"; body.textContent = f.q.replace(/[ \t]+/g, "").replace(/\n{2,}/g, "\n").trim();
-      if ((f.kind || "q") === "q") card.append(w, body, ask, cnt);
+      if (kindOf(f) === "q") card.append(w, body, ask, cnt);
       else {
         const cue = document.createElement("div"); cue.className = "cue"; cue.style.whiteSpace = "pre-wrap";
         cue.textContent = (f.hd && f.hd.length ? `このページの見出し:${f.hd.join("／")}\n` : "") + "書き出し:" + f.q.replace(/\s+/g, "").slice(0, 28) + "……";
@@ -2828,7 +3206,7 @@ function renderReview() {
     const ctx = document.createElement("div"); ctx.className = "ctx"; const b = document.createElement("b"); b.textContent = cx.q; ctx.append(cx.pre, b, cx.post);
     card.append(w, ctx, ask, cnt);
     // 「覚える」「試験に出そう」は、選んだ言葉を伏せて出す(思い出してから開く)。「わからない」は伏せずに出す
-    if ((f.kind || "q") !== "q") {
+    if (kindOf(f) === "m") {
       b.classList.add("hide"); const sh = document.createElement("button"); sh.textContent = "答えを見る";
       sh.onclick = () => { b.classList.remove("hide"); sh.remove(); };
       row.append(sh);
@@ -2840,8 +3218,12 @@ function renderReview() {
   const all = fsScope();
   const open = all.filter(f => !f.done), done = all.filter(f => f.done);
   const sum = document.createElement("div"); sum.className = "fs-sum";
-  for (const k of Object.keys(FSK)) { const n = open.filter(f => (f.kind || "q") === k).length; const s = document.createElement("span"); s.className = `fs-chip k-${k}`; s.textContent = `${FSK[k]} ${n}`; sum.append(s); }
-  sum.append(`わかった ${done.length}枚`);
+  const allK = allOf("fs:").filter(f => chOf(f.ch) && (!rv.ch || f.ch === rv.ch) && !f.done);
+  for (const k of Object.keys(FSK)) {
+    const n = allK.filter(f => kindOf(f) === k).length; const s = document.createElement("button"); s.className = `fs-chip k-${k}`; s.style.cssText = "border:0;cursor:pointer;font-size:12px;padding:4px 10px" + (rv.kind && rv.kind !== k ? ";opacity:.35" : "") + (rv.kind === k ? ";box-shadow:0 0 0 2px var(--ink)" : "");
+    s.textContent = `${FSK[k]} ${n}`; s.onclick = () => { rv.kind = rv.kind === k ? "" : k; renderReview(); }; sum.append(s);
+  }
+  sum.append(`わかった ${done.length}枚(色の札を押すと、その種類だけ)`);
   box.append(sum);
   const scopes = [["", "全部の章"]]; const here = rv.ch || (cur && cur.id); if (here) scopes.push([here, `${chOf(here).no || "この章"}だけ`]);
   if (scopes.length > 1) box.append(segOf(scopes, rv.ch, v => { rv.ch = v; renderReview(); }));
@@ -2853,32 +3235,119 @@ function renderReview() {
   if (!list.length) { const p = document.createElement("p"); p.style.cssText = "color:var(--ink-soft);font-size:13px;line-height:1.7;margin:0"; p.textContent = all.length ? "ここに出す付箋はありません。" : "まだ付箋はありません。読んでいて「わからない」「覚えたい」「試験に出そう」と思った言葉を長押しして「付箋」を押すと、はれます。ページごと振り返りたいときは、読書中に上の「付箋」→「このページに付箋をはる」。"; box.append(p); return; }
   for (const f of list) {
     const c = chOf(f.ch);
-    const b = document.createElement("button"); b.className = `nb-item k-${f.kind || "q"}`;
+    const b = document.createElement("button"); b.className = `nb-item k-${kindOf(f)}`;
     const w = document.createElement("span"); w.className = "w";
-    const chip = document.createElement("span"); chip.className = "fs-chip" + (f.done ? " done" : ""); chip.textContent = f.done ? "わかった" : FSK[f.kind || "q"];
+    const chip = document.createElement("span"); chip.className = "fs-chip" + (f.done ? " done" : ""); chip.textContent = f.done ? "わかった" : FSK[kindOf(f)];
     w.append(chip, `　${f.pg ? "ページ　" : ""}${c.no}　${secTitle(f) || c.title}` + (f.n ? `・振り返り${f.n}回` : ""));
     const qt = f.pg ? f.q.replace(/\s+/g, "") : f.q, lim = f.pg ? 70 : 140;
     const q = document.createElement("span"); q.className = "q"; q.style.setProperty("--hlc", "var(--fsc)"); q.textContent = qt.length > lim ? qt.slice(0, lim) + "…" : qt;
     b.append(w, q);
     if (f.note) { const n = document.createElement("span"); n.className = "n"; n.textContent = f.note; b.append(n); }
-    b.onclick = () => { closeSheets(); jumpToFs(f.ch, f.key); };
+    b.onclick = () => { closeSheets(); rememberSpot("ここまで読んでいた"); jumpToFs(f.ch, f.key); };
     box.append(b);
   }
 }
 function jumpToFs(chId, key) {
-  if (!cur || cur.id !== chId) openChapter(chId, null);
-  setTimeout(() => {
+  withChapter(chId, () => {
     const m = page.querySelector(`mark.fs[data-id="${CSS.escape(key)}"]`);
-    if (m) { scrollToEl(m); alignLine(); onScroll(); return; }
+    if (m) { goToEl(m); return; }
     // ページの付箋:その文章の頭の文字へ
     const f = live(key); if (!f) return;
-    const root = page.querySelector(".chapter") || page, ft = flatText(root), s = findAnchor(ft.text, f); if (s < 0) return;
-    const p = pointOf(ft, s, false); if (!p) return;
-    const r = document.createRange(); r.setStart(p.n, p.o); r.setEnd(p.n, Math.min(p.n.nodeValue.length, p.o + 1));
-    const pr = page.getBoundingClientRect(), g = gutter(), b = r.getBoundingClientRect();
-    page.scrollLeft += b.right - (pr.right - g.r) + 2; alignLine(); onScroll();
-  }, 260);
+    const root = page.querySelector(".chapter") || page, ft = flatText(root), s = findAnchor(ft.text, f); if (s >= 0) goToOff(s);
+  });
 }
+
+/* ===== しるし(付箋・マーカー)のあるページだけ読む =====
+   指で払う・端をタップすると、次のしるしのページへ(章をまたいでも)。種類は選べる。条件は端末ごとに覚える */
+let MM = null;
+const MK_KINDS = [["q", FSK.q], ["m", FSK.m], ["i", FSK.i], ["hl", "マーカー"]];
+const mkPref = () => Object.assign({ kinds: ["q", "m", "i", "hl"], done: 0 }, pref.mk || {});
+function markItems(chId, cond) {
+  const c = cond || MM; if (!c) return [];
+  const ks = new Set(c.kinds), out = [];
+  for (const f of allOf("fs:")) if (f.ch === chId && ks.has(kindOf(f)) && (c.done || !f.done)) out.push(f);
+  if (ks.has("hl")) for (const h of allOf("hl:")) if (h.ch === chId) out.push(h);
+  return out;
+}
+// いまの章で、しるしのあるページの番号(小さい順)
+function markPages() {
+  if (!cur) return [];
+  const root = page.querySelector(".chapter") || page, ft = flatText(root), set_ = new Set();
+  // しるしの始まりのページと、ページをまたぐしるしは終わりのページも
+  for (const it of markItems(cur.id)) {
+    const s = findAnchor(ft.text, it); if (s < 0) continue;
+    const a = pageOfOff(s, ft), b = pageOfOff(Math.max(s, s + (it.q || "").trimEnd().length - 1), ft);
+    for (let i = Math.max(0, a); i <= b && i - a < 40; i++) set_.add(i);
+  }
+  return [...set_].sort((a, b) => a - b);
+}
+function markTurn(dir) {
+  const mp = markPages(), cp = pageAt(page.scrollLeft);
+  const nx = dir > 0 ? mp.find(i => i > cp) : [...mp].reverse().find(i => i < cp);
+  if (nx != null) { goPage(nx, true); return; }
+  const ci = chapters.indexOf(cur), list = dir > 0 ? chapters.slice(ci + 1) : chapters.slice(0, ci).reverse();
+  const ch = list.find(c => markItems(c.id).length);
+  if (!ch) { toast(dir > 0 ? "これより後ろに、しるしのあるページはありません" : "これより前に、しるしのあるページはありません"); return; }
+  openChapter(ch.id, 0, null, () => { const m2 = markPages(); if (m2.length) goPage(dir > 0 ? m2[0] : m2[m2.length - 1], false); toast(`${ch.no ? ch.no + "　" : ""}${ch.title}`); });
+}
+function updateMarkBar() {
+  const bar = document.getElementById("markbar");
+  if (!MM || !cur) { bar.hidden = true; return; }
+  bar.hidden = false;
+  const mp = markPages(), cp = pageAt(page.scrollLeft), k = mp.indexOf(cp);
+  const total = chapters.reduce((a, c) => a + markItems(c.id).length, 0);
+  document.getElementById("mb-t").textContent = `しるし ${k >= 0 ? k + 1 : "–"}/${mp.length}ページ・全${total}か所`;
+}
+function startMarks(cond) {
+  const total = chapters.reduce((a, c) => a + markItems(c.id, cond).length, 0);
+  if (!total) { toast("この条件のしるし(付箋・マーカー)はまだありません"); return; }
+  MM = cond; pref.mk = { kinds: cond.kinds, done: cond.done }; try { localStorage.setItem(LS_PREF, JSON.stringify(pref)); } catch (e) {}
+  if (cur && ready) {
+    if (markPages().includes(pageAt(page.scrollLeft))) { updateMarkBar(); return; }
+    const mp = markPages(), nx = mp.find(i => i > pageAt(page.scrollLeft));
+    if (nx != null || markItems(cur.id).length && !chapters.slice(chapters.indexOf(cur) + 1).some(c => markItems(c.id).length)) { goPage(nx != null ? nx : mp[0], false); updateMarkBar(); return; }
+    markTurn(1); return;
+  }
+  const ch = chapters.find(c => markItems(c.id).length);
+  openChapter(ch.id, 0, null, () => { const m2 = markPages(); if (m2.length) goPage(m2[0], false); updateMarkBar(); });
+}
+function stopMarks() { MM = null; updateMarkBar(); toast("ふつうに読む(1ページずつ)に戻しました"); }
+function openMarkSheet() {
+  const cond = MM ? { kinds: [...MM.kinds], done: MM.done } : mkPref();
+  const kb = document.getElementById("mk-kinds"); kb.innerHTML = "";
+  const counts = k => chapters.reduce((a, c) => a + markItems(c.id, { kinds: [k], done: cond.done }).length, 0);
+  const draw = () => {
+    kb.innerHTML = "";
+    for (const [k, label] of MK_KINDS) {
+      const b = document.createElement("button"); b.className = k === "hl" ? "" : `k-${k}`; b.classList.toggle("on", cond.kinds.includes(k));
+      const sw = document.createElement("span"); sw.className = "sw"; if (k === "hl") sw.style.background = "linear-gradient(90deg,#f2d34b 50%,#79b8e8 50%)";
+      b.append(sw, `${label} ${counts(k)}`);
+      b.onclick = () => { cond.kinds = cond.kinds.includes(k) ? cond.kinds.filter(x => x !== k) : [...cond.kinds, k]; draw(); };
+      kb.append(b);
+    }
+    document.querySelectorAll("#mk-done button").forEach(x => x.classList.toggle("on", +x.dataset.v === (cond.done ? 1 : 0)));
+    // 一覧:条件に合うしるしを本の順に。押すとそのページへ
+    const box = document.getElementById("mk-list"); box.innerHTML = "";
+    const items = chapters.flatMap(c => markItems(c.id, cond).map(it => ({ ...it, _o: chapters.indexOf(c) }))).sort((a, b) => a._o - b._o || (a.at || 0) - (b.at || 0));
+    for (const it of items) {
+      const c = chOf(it.ch), isFs = it.key.startsWith("fs:");
+      const b = document.createElement("button"); b.className = "nb-item" + (isFs ? ` k-${kindOf(it)}` : "");
+      const w = document.createElement("span"); w.className = "w";
+      if (isFs) { const chip = document.createElement("span"); chip.className = "fs-chip" + (it.done ? " done" : ""); chip.textContent = FSK[kindOf(it)]; w.append(chip, "　"); }
+      w.append(`${isFs ? "" : "マーカー　"}${c.no}　${secTitle(it) || c.title}`);
+      const t = (it.q || "").replace(/\s+/g, ""); const q = document.createElement("span"); q.className = "q"; q.style.setProperty("--hlc", isFs ? "var(--fsc)" : HLC[it.color || "y"]); q.textContent = t.length > 90 ? t.slice(0, 90) + "…" : t;
+      b.append(w, q); b.onclick = () => { closeSheets(); if (!MM) startMarksQuiet(cond); isFs ? jumpToFs(it.ch, it.key) : jumpToMark(it.ch, it.key); };
+      box.append(b);
+    }
+  };
+  document.querySelectorAll("#mk-done button").forEach(x => x.onclick = () => { cond.done = +x.dataset.v; draw(); });
+  document.getElementById("mk-start").onclick = () => { if (!cond.kinds.length) { toast("種類を一つ以上選んでください"); return; } closeSheets(); startMarks({ kinds: cond.kinds, done: cond.done }); };
+  draw(); openSheet("sh-mk");
+}
+function startMarksQuiet(cond) { if (cond.kinds.length) { MM = { kinds: cond.kinds, done: cond.done }; } }
+document.getElementById("h-marks").onclick = openMarkSheet;
+document.getElementById("mb-kind").onclick = openMarkSheet;
+document.getElementById("mb-exit").onclick = stopMarks;
 
 /* ===== マイノート ===== */
 let nbFilter = "all";
@@ -2899,13 +3368,12 @@ function renderNotebook() {
     const q = document.createElement("span"); q.className = "q"; q.textContent = it.kind === "bm" ? it.label : (it.q.length > 140 ? it.q.slice(0, 140) + "…" : it.q);
     q.style.setProperty("--hlc", it.kind === "bm" ? "var(--shu)" : HLC[it.color || "y"]); b.append(q);
     if (it.note) { const n = document.createElement("span"); n.className = "n"; n.textContent = it.note; b.append(n); }
-    b.onclick = () => { closeSheets(); if (it.kind === "bm") openChapter(it.ch, it.p); else jumpToMark(it.ch, it.key); };
+    b.onclick = () => { closeSheets(); rememberSpot("ノートを開く前"); if (it.kind === "bm") openChapter(it.ch, it.p); else jumpToMark(it.ch, it.key); };
     box.append(b);
   }
 }
 function jumpToMark(chId, key) {
-  openChapter(chId, null);
-  setTimeout(() => { const m = page.querySelector(`mark.hl[data-id="${CSS.escape(key)}"]`); if (m) { scrollToEl(m); alignLine(); onScroll(); } }, 260);
+  withChapter(chId, () => { const m = page.querySelector(`mark.hl[data-id="${CSS.escape(key)}"]`); if (m) goToEl(m); });
 }
 
 /* ===== 本の中を検索 ===== */
@@ -2932,13 +3400,12 @@ document.getElementById("sr-form").addEventListener("submit", e => {
   box.prepend(head);
 });
 function jumpToFind(chId, q, k) {
-  openChapter(chId, null);
-  setTimeout(() => {
+  rememberSpot("検索する前");
+  withChapter(chId, () => {
     const root = page.querySelector(".chapter") || page; const ft = flatText(root);
     let i = -1; for (let j = 0; j <= k; j++) { i = ft.text.indexOf(q, i + 1); if (i < 0) return; }
-    const els = wrapRange(ft, i, i + q.length, () => { const m = document.createElement("mark"); m.className = "find"; return m; });
-    if (els[0]) { scrollToEl(els[0]); alignLine(); onScroll(); setTimeout(() => els.forEach(m => m.replaceWith(...m.childNodes)), 6000); }
-  }, 260);
+    goToOff(i); flashRange(i, i + q.length);
+  });
 }
 
 /* ===== 他の端末で先に進んでいたら知らせる ===== */
@@ -3147,7 +3614,7 @@ document.getElementById("pl-open").onclick = () => {
   if (!L) return; const s = EAR[L.ch][L.si];
   pauseL();
   if (s.id.endsWith("-lead")) openChapter(L.ch, 0);
-  else if (s.id.endsWith("-end")) { openChapter(L.ch, null); setTimeout(() => { const e = page.querySelector(".end"); if (e) scrollToEl(e); }, 250); }
+  else if (s.id.endsWith("-end")) openChapter(L.ch, null, null, () => { const e = page.querySelector(".end"); if (e) goToEl(e); });
   else openChapter(L.ch, null, s.id);
   toast("聞いていた節を本で開きました。読み進めると「読」の印がつきます");
 };
@@ -3225,9 +3692,12 @@ document.addEventListener("visibilitychange", () => {
 });
 
 /* ===== 起動 ===== */
-applyPref(); renderHome();
-syncStatus(navigator.onLine ? "" : "off", navigator.onLine ? "同期しています…" : "オフライン。端末に保存した内容で読めます");
+applyPref(); applyFsColors(); renderHome();
+syncStatus(SANDBOX ? "" : navigator.onLine ? "" : "off", SANDBOX ? "試し読み(同期しません)" : navigator.onLine ? "同期しています…" : "オフライン。端末に保存した内容で読めます");
 syncAll("resume").then(() => {
+  applyFsColors();
+  // 付箋の種類を3つにしたので、前の「試験に出そう」は「覚える・試験に出そう」にまとめる(どの端末で直しても同じ結果)
+  for (const f of allOf("fs:")) if (f.kind === "e") set(f.key, { ...live(f.key), kind: "m" });
   const h = location.hash.slice(1);
   if (h && chapters.find(c => c.id === h)) openChapter(h, null);
 });
