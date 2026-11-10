@@ -2806,9 +2806,24 @@ document.getElementById("hl-del").onclick = () => {
 };
 
 /* ===== しおり ===== */
-// 記録:「bm:id」= { ch, p(章の中の位置), label }。消したら { del: 1 }
+// 記録:「bm:id」= { ch, p(章の中の位置。古い記録の予備), q/pre/post/at(ページの最初の文字。端末や文字の大きさが違っても同じ文に戻る), label }。消したら { del: 1 }
 function pageFrac() { return Math.max(0.001, (page.clientWidth - gutter().l - gutter().r) / maxScroll()); }
-function bookmarkHere() { if (!cur) return null; const p = getP(), f = pageFrac(); return allOf("bm:").find(b => b.ch === cur.id && Math.abs(b.p - p) < f * 0.6) || null; }
+// しおりの文字が本文のどこか(見つからなければ -1)
+function bmOff(b, ft) { if (!b.q) return -1; ft = ft || flatText(page.querySelector(".chapter") || page); return findAnchor(ft.text, b); }
+function bookmarkHere() {
+  if (!cur) return null;
+  const list = allOf("bm:").filter(b => b.ch === cur.id); if (!list.length) return null;
+  const r = pageTextRange(), p = getP(), f = pageFrac();
+  return list.find(b => { const o = r ? bmOff(b, r.ft) : -1; return o >= 0 ? (o >= r.s && o < r.e) : Math.abs(b.p - p) < f * 0.6; }) || null;
+}
+// しおりの場所を開く(はさんだページの最初の文字があるページへ)
+function openBookmark(b) {
+  withChapter(b.ch, () => {
+    const o = bmOff(b);
+    if (o >= 0) goToOff(o, false); else { setP(b.p); alignLine(); onScroll(); }
+    notePlace(); updateRibbon();
+  });
+}
 function updateRibbon() { document.getElementById("ribbon").hidden = !bookmarkHere(); const b = document.getElementById("r-bm"); if (b) b.textContent = bookmarkHere() ? "しおりを外す" : "しおり"; }
 function toggleBookmark() {
   if (!cur) return;
@@ -2818,7 +2833,10 @@ function toggleBookmark() {
     // しおりの名前:いま読んでいる節の見出し
     const pr = page.getBoundingClientRect(); let label = cur.title;
     page.querySelectorAll("h3[id]").forEach(h => { if (h.getBoundingClientRect().right >= pr.left + 4) label = h.textContent; });
-    set("bm:" + Date.now().toString(36), { ch: cur.id, p: Math.round(getP() * 1000) / 1000, label });
+    // 場所は「このページの最初の文字(と前後)」で覚える。%だけだと iPhone と iPad でずれる
+    const rec = { ch: cur.id, p: Math.round(getP() * 1000) / 1000, label }, r = pageTextRange();
+    if (r) { const t = r.ft.text; let s = r.s; while (s < r.e - 1 && /\s/.test(t[s])) s++; Object.assign(rec, { at: s, q: t.slice(s, s + 16), pre: t.slice(Math.max(0, s - 12), s), post: t.slice(s + 16, s + 28) }); }
+    set("bm:" + Date.now().toString(36), rec);
     toast("しおりをはさみました");
   }
   updateRibbon();
@@ -3260,13 +3278,15 @@ function jumpToFs(chId, key) {
 /* ===== しるし(付箋・マーカー)のあるページだけ読む =====
    指で払う・端をタップすると、次のしるしのページへ(章をまたいでも)。種類は選べる。条件は端末ごとに覚える */
 let MM = null;
-const MK_KINDS = [["q", FSK.q], ["m", FSK.m], ["i", FSK.i], ["hl", "マーカー"]];
-const mkPref = () => Object.assign({ kinds: ["q", "m", "i", "hl"], done: 0 }, pref.mk || {});
+const MK_KINDS = [["q", FSK.q], ["m", FSK.m], ["i", FSK.i], ["hl", "マーカー"], ["bm", "しおり"]];
+const mkPref = () => Object.assign({ kinds: ["q", "m", "i", "hl", "bm"], done: 0 }, pref.mk || {});
 function markItems(chId, cond) {
   const c = cond || MM; if (!c) return [];
   const ks = new Set(c.kinds), out = [];
   for (const f of allOf("fs:")) if (f.ch === chId && ks.has(kindOf(f)) && (c.done || !f.done)) out.push(f);
   if (ks.has("hl")) for (const h of allOf("hl:")) if (h.ch === chId) out.push(h);
+  // しおりは「そのページ」の印(場所を文字で覚えている新しいしおりだけ)
+  if (ks.has("bm")) for (const b of allOf("bm:")) if (b.ch === chId && b.q) out.push({ ...b, q: b.q.slice(0, 1) });
   return out;
 }
 // いまの章で、しるしのあるページの番号(小さい順)
@@ -3300,7 +3320,7 @@ function updateMarkBar() {
 }
 function startMarks(cond) {
   const total = chapters.reduce((a, c) => a + markItems(c.id, cond).length, 0);
-  if (!total) { toast("この条件のしるし(付箋・マーカー)はまだありません"); return; }
+  if (!total) { toast("この条件のしるし(付箋・マーカー・しおり)はまだありません"); return; }
   MM = cond; pref.mk = { kinds: cond.kinds, done: cond.done }; try { localStorage.setItem(LS_PREF, JSON.stringify(pref)); } catch (e) {}
   if (cur && ready) {
     if (markPages().includes(pageAt(page.scrollLeft))) { updateMarkBar(); return; }
@@ -3319,8 +3339,8 @@ function openMarkSheet() {
   const draw = () => {
     kb.innerHTML = "";
     for (const [k, label] of MK_KINDS) {
-      const b = document.createElement("button"); b.className = k === "hl" ? "" : `k-${k}`; b.classList.toggle("on", cond.kinds.includes(k));
-      const sw = document.createElement("span"); sw.className = "sw"; if (k === "hl") sw.style.background = "linear-gradient(90deg,#f2d34b 50%,#79b8e8 50%)";
+      const b = document.createElement("button"); b.className = k === "hl" || k === "bm" ? "" : `k-${k}`; b.classList.toggle("on", cond.kinds.includes(k));
+      const sw = document.createElement("span"); sw.className = "sw"; if (k === "hl") sw.style.background = "linear-gradient(90deg,#f2d34b 50%,#79b8e8 50%)"; if (k === "bm") sw.style.background = "var(--shu)";
       b.append(sw, `${label} ${counts(k)}`);
       b.onclick = () => { cond.kinds = cond.kinds.includes(k) ? cond.kinds.filter(x => x !== k) : [...cond.kinds, k]; draw(); };
       kb.append(b);
@@ -3330,13 +3350,13 @@ function openMarkSheet() {
     const box = document.getElementById("mk-list"); box.innerHTML = "";
     const items = chapters.flatMap(c => markItems(c.id, cond).map(it => ({ ...it, _o: chapters.indexOf(c) }))).sort((a, b) => a._o - b._o || (a.at || 0) - (b.at || 0));
     for (const it of items) {
-      const c = chOf(it.ch), isFs = it.key.startsWith("fs:");
+      const c = chOf(it.ch), isFs = it.key.startsWith("fs:"), isBm = it.key.startsWith("bm:");
       const b = document.createElement("button"); b.className = "nb-item" + (isFs ? ` k-${kindOf(it)}` : "");
       const w = document.createElement("span"); w.className = "w";
       if (isFs) { const chip = document.createElement("span"); chip.className = "fs-chip" + (it.done ? " done" : ""); chip.textContent = FSK[kindOf(it)]; w.append(chip, "　"); }
-      w.append(`${isFs ? "" : "マーカー　"}${c.no}　${secTitle(it) || c.title}`);
-      const t = (it.q || "").replace(/\s+/g, ""); const q = document.createElement("span"); q.className = "q"; q.style.setProperty("--hlc", isFs ? "var(--fsc)" : HLC[it.color || "y"]); q.textContent = t.length > 90 ? t.slice(0, 90) + "…" : t;
-      b.append(w, q); b.onclick = () => { closeSheets(); if (!MM) startMarksQuiet(cond); isFs ? jumpToFs(it.ch, it.key) : jumpToMark(it.ch, it.key); };
+      w.append(isBm ? `しおり　${c.no}　${it.label || c.title}` : `${isFs ? "" : "マーカー　"}${c.no}　${secTitle(it) || c.title}`);
+      const t = (isBm ? (get(it.key) || {}).q || "" : it.q || "").replace(/\s+/g, ""); const q = document.createElement("span"); q.className = "q"; q.style.setProperty("--hlc", isBm ? "var(--shu)" : isFs ? "var(--fsc)" : HLC[it.color || "y"]); q.textContent = t.length > 90 ? t.slice(0, 90) + "…" : t;
+      b.append(w, q); b.onclick = () => { closeSheets(); if (!MM) startMarksQuiet(cond); isBm ? openBookmark(get(it.key) ? { ...get(it.key), key: it.key } : it) : isFs ? jumpToFs(it.ch, it.key) : jumpToMark(it.ch, it.key); };
       box.append(b);
     }
   };
@@ -3365,10 +3385,10 @@ function renderNotebook() {
     const c = chOf(it.ch); if (!c) continue;
     const b = document.createElement("button"); b.className = "nb-item";
     const w = document.createElement("span"); w.className = "w"; w.textContent = `${c.no}　${c.title}` + (it.kind === "bm" ? `・しおり(${Math.round(it.p * 100)}%)` : ""); b.append(w);
-    const q = document.createElement("span"); q.className = "q"; q.textContent = it.kind === "bm" ? it.label : (it.q.length > 140 ? it.q.slice(0, 140) + "…" : it.q);
+    const q = document.createElement("span"); q.className = "q"; q.textContent = it.kind === "bm" ? it.label + (it.q ? `「${it.q.replace(/\s+/g, "")}…」から` : "") : (it.q.length > 140 ? it.q.slice(0, 140) + "…" : it.q);
     q.style.setProperty("--hlc", it.kind === "bm" ? "var(--shu)" : HLC[it.color || "y"]); b.append(q);
     if (it.note) { const n = document.createElement("span"); n.className = "n"; n.textContent = it.note; b.append(n); }
-    b.onclick = () => { closeSheets(); rememberSpot("ノートを開く前"); if (it.kind === "bm") openChapter(it.ch, it.p); else jumpToMark(it.ch, it.key); };
+    b.onclick = () => { closeSheets(); rememberSpot("ノートを開く前"); if (it.kind === "bm") openBookmark(it); else jumpToMark(it.ch, it.key); };
     box.append(b);
   }
 }
