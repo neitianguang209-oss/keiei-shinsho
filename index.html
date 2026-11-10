@@ -174,8 +174,29 @@ body.reading-calm .chrome.top{transform:translateY(-100%)} body.reading-calm .ch
 .gut{position:fixed;top:0;bottom:0;z-index:2;pointer-events:none;background:var(--paper)}
 .gut.l{left:0;width:max(var(--mx),env(safe-area-inset-left))} .gut.r{right:0;width:max(var(--mx),env(safe-area-inset-right))}
 /* しおりのリボン(右上) */
-.ribbon{position:fixed;top:0;right:calc(max(var(--mx),env(safe-area-inset-right)) + 6px);width:16px;height:calc(env(safe-area-inset-top) + 34px);background:var(--shu);z-index:3;pointer-events:none;
-  clip-path:polygon(0 0,100% 0,100% 100%,50% 82%,0 100%)}
+.ribbon{position:fixed;top:0;right:calc(max(var(--mx),env(safe-area-inset-right)) + 4px);width:22px;height:calc(env(safe-area-inset-top) + var(--padY,34px) - 2px);background:var(--shu);z-index:3;pointer-events:none;
+  clip-path:polygon(0 0,100% 0,100% 100%,50% 78%,0 100%);filter:drop-shadow(0 1px 1px rgba(0,0,0,.25))}
+.ribbon.drop{animation:rbdrop .5s cubic-bezier(.2,.9,.3,1.25)}
+@keyframes rbdrop{from{transform:translateY(-100%)}to{transform:none}}
+@media (prefers-reduced-motion:reduce){ .ribbon.drop{animation:none} }
+/* しおりのあるページは、上の章名の横にも「しおり」と出す */
+.runhead .rb{display:none;color:#fff;background:var(--shu);border-radius:3px;padding:1px 6px;margin-left:6px;font-weight:700;letter-spacing:.05em}
+.runhead.bm .rb{display:inline-block}
+/* 位置のつまみの上に、しおりの場所を赤い目印で */
+.seekwrap{flex:1;position:relative;display:flex;align-items:center}
+.seekwrap input{width:100%}
+.bmticks{position:absolute;left:0;right:0;top:-12px;height:12px;pointer-events:none}
+.bmticks button{position:absolute;top:0;width:24px;height:22px;margin-right:-12px;padding:0;border:0;background:none;cursor:pointer;pointer-events:auto;transform:translateY(-6px)}
+.bmticks button::after{content:"";position:absolute;left:7px;top:6px;width:10px;height:14px;background:var(--shu);clip-path:polygon(0 0,100% 0,100% 100%,50% 75%,0 100%)}
+/* 表紙の「しおり」一覧と目次の印 */
+.bmlist{display:flex;flex-direction:column;gap:6px}
+.bmlist .h{font-family:var(--gothic);font-size:12px;color:var(--shu);letter-spacing:.05em;display:flex;align-items:center;gap:6px}
+.bmlist .h::before,.bmrow::before{content:"";width:10px;height:14px;background:var(--shu);clip-path:polygon(0 0,100% 0,100% 100%,50% 75%,0 100%);flex:none}
+.bmrow{display:flex;gap:10px;align-items:center;width:100%;text-align:left;background:var(--paper);border:1px solid var(--rule);border-left:3px solid var(--shu);padding:10px 12px;cursor:pointer;border-radius:2px;color:var(--ink)}
+.bmrow .t{display:block;font-size:15px;font-weight:600}
+.bmrow .s{display:block;font-family:var(--gothic);font-size:12px;color:var(--ink-soft);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bmrow .tx{min-width:0;flex:1}
+.toc-row .bmc{display:inline-block;margin-left:6px;font-family:var(--gothic);font-size:10px;color:#fff;background:var(--shu);border-radius:8px;padding:1px 7px;vertical-align:middle}
 /* 下の表示(Kindle と同じく、左に章の残り時間、右に本全体の進み) */
 .foot{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 8px);z-index:3;display:flex;justify-content:space-between;
   padding:0 max(var(--mx),env(safe-area-inset-left));font-family:var(--gothic);font-size:10px;color:var(--ink-soft);pointer-events:none;font-variant-numeric:tabular-nums}
@@ -344,6 +365,7 @@ body.listening .foot{display:none}
     <div class="band"></div>
   </div>
   <button class="resume" id="resume" hidden></button>
+  <div class="bmlist" id="bmlist" hidden></div>
   <div class="listen-card" id="listencard">
     <span class="k">耳で聞く</span>
     <span class="t" id="lc-t">まだ聞いていません</span>
@@ -386,7 +408,7 @@ body.listening .foot{display:none}
     <button id="r-bm" aria-label="しおり">しおり</button>
   </div>
   <div class="chrome bottom">
-    <div class="row"><span id="pct">0%</span><input type="range" id="seek" min="0" max="1000" value="0" aria-label="章の中の位置"><span id="chpos"></span></div>
+    <div class="row"><span id="pct">0%</span><span class="seekwrap"><span class="bmticks" id="bmticks"></span><input type="range" id="seek" min="0" max="1000" value="0" aria-label="章の中の位置"></span><span id="chpos"></span></div>
     <div class="row"><button id="nextch">← 次の章</button><button id="r-notes">ノート</button><button id="listenhere">ここから聞く</button><button id="markdone">読了にする</button><button id="prevch">前の章 →</button></div>
   </div>
 </div>
@@ -2096,6 +2118,8 @@ function renderHome() {
       const heard = es.filter(k => get("lis:" + k)).length;
       if (heard) { const e = document.createElement("span"); e.className = "ear"; e.textContent = heard === es.length ? "耳で聞き終えた" : `耳で ${heard}/${es.length} 聞いた`; row.querySelector(".tt").append(e); }
     }
+    const nbm = bmsOf(c.id).length;
+    if (nbm) { const k = document.createElement("span"); k.className = "bmc"; k.textContent = `しおり ${nbm}`; row.querySelector(".tt").firstChild.after(k); }
     row.onclick = () => openChapter(c.id, st === "done" ? 0 : null);
     li.append(row);
     if (c.secs.length) {
@@ -2120,7 +2144,7 @@ function renderHome() {
   document.getElementById("allbar").style.width = (sum / chapters.length * 100).toFixed(1) + "%";
   const allEar = Object.keys(EAR), heardAll = allEar.filter(k => get("lis:" + k)).length;
   document.getElementById("alltxt").textContent = `全${chapters.length}章のうち ${doneCount}章を読了(全体の ${Math.round(sum / chapters.length * 100)}%)` + (allEar.length ? `・耳で聞いたのは ${Math.round(heardAll / allEar.length * 100)}%` : "");
-  renderListenCard();
+  renderListenCard(); renderBmList();
   const fsOpen = Object.keys(store.items).filter(k => k.startsWith("fs:") && get(k) && !get(k).del && !get(k).done).length;
   document.getElementById("h-review").textContent = fsOpen ? `付箋で振り返る(まだ ${fsOpen}枚)` : "付箋で振り返る";
   const last = get("last"); const btn = document.getElementById("resume");
@@ -2196,7 +2220,7 @@ function openChapter(id, p, secId, onReady) {
   // 巻末の一覧(タグの付いた箇所)を組み立てる
   const tl = clone.querySelector("#taglist-slot"); if (tl) buildTagList(tl);
   document.getElementById("ttl").textContent = c.title;
-  document.getElementById("runhead").textContent = c.no ? `${c.no}　${c.title}` : c.title;
+  { const rh = document.getElementById("runhead"); rh.textContent = c.no ? `${c.no}　${c.title}` : c.title; const rb = document.createElement("span"); rb.className = "rb"; rb.textContent = "しおり"; rh.append(rb); }
   document.getElementById("markdone").textContent = stateOf(c.id) === "done" ? "読了ずみ" : "読了にする";
   document.body.classList.add("reading-calm");
   afterLayout(() => {
@@ -2205,7 +2229,7 @@ function openChapter(id, p, secId, onReady) {
     if (updateKwNumbers()) { pages = []; buildPages(); }
     const h = secId && clone.querySelector("#" + CSS.escape(secId));
     if (h) goToEl(h); else { setP(p == null ? ((get("pos:" + c.id) || {}).p || 0) : p); alignLine(); }
-    ready = true; onScroll();
+    ready = true; onScroll(); renderBmTicks();
     if (stateOf(c.id) === "unread") set("st:" + c.id, "reading");
     updateMarkBar(); showBackChip();
     if (onReady) onReady();
@@ -2243,6 +2267,7 @@ function relayoutKeep() {
   pages = []; buildPages();
   if (updateKwNumbers()) { pages = []; buildPages(); }
   if (off >= 0) goToOff(off, false); else { alignLine(); onScroll(); }
+  renderBmTicks();
 }
 
 /* ===== 考えてみよう:回答例(章末と巻末の想定問題一覧) =====
@@ -2824,7 +2849,43 @@ function openBookmark(b) {
     notePlace(); updateRibbon();
   });
 }
-function updateRibbon() { document.getElementById("ribbon").hidden = !bookmarkHere(); const b = document.getElementById("r-bm"); if (b) b.textContent = bookmarkHere() ? "しおりを外す" : "しおり"; }
+function updateRibbon() {
+  const here = !!bookmarkHere();
+  document.getElementById("ribbon").hidden = !here;
+  document.getElementById("runhead").classList.toggle("bm", here);
+  const b = document.getElementById("r-bm"); if (b) b.textContent = here ? "しおりを外す" : "しおり";
+}
+// 章のしおり(本の順)
+const bmsOf = chId => allOf("bm:").filter(b => b.ch === chId).sort((a, b) => (a.at != null && b.at != null ? a.at - b.at : a.p - b.p));
+// 位置のつまみの上に、この章のしおりの目印(押すとそのページへ)
+function renderBmTicks() {
+  const box = document.getElementById("bmticks"); box.innerHTML = "";
+  if (!cur || !pages.length) return;
+  const ft = flatText(page.querySelector(".chapter") || page), last = Math.max(1, pages.length - 1);
+  for (const b of bmsOf(cur.id)) {
+    const o = bmOff(b, ft), i = o >= 0 ? pageOfOff(o, ft) : Math.round(b.p * last);
+    if (i < 0) continue;
+    const t = document.createElement("button"); t.type = "button"; t.style.right = (i / last * 100) + "%";
+    t.setAttribute("aria-label", "しおり:" + (b.label || "")); t.title = b.label || "しおり";
+    t.onclick = e => { e.stopPropagation(); rememberSpot("しおりへ飛ぶ前"); openBookmark(b); };
+    box.append(t);
+  }
+}
+// 表紙:はさんだしおりの一覧(押すとその場所へ)
+function renderBmList() {
+  const box = document.getElementById("bmlist"); box.innerHTML = "";
+  const all = chapters.flatMap(c => bmsOf(c.id));
+  box.hidden = !all.length; if (!all.length) return;
+  const h = document.createElement("div"); h.className = "h"; h.textContent = `しおり(${all.length})`; box.append(h);
+  for (const b of all) {
+    const c = chOf(b.ch); if (!c) continue;
+    const r = document.createElement("button"); r.className = "bmrow";
+    const tx = document.createElement("span"); tx.className = "tx";
+    const t = document.createElement("span"); t.className = "t"; t.textContent = `${c.no ? c.no + "　" : ""}${b.label || c.title}`;
+    const sm = document.createElement("span"); sm.className = "s"; sm.textContent = b.q ? `「${b.q.replace(/\s+/g, "")}…」から` : `この章の ${Math.round(b.p * 100)}% のあたり`;
+    tx.append(t, sm); r.append(tx); r.onclick = () => openBookmark(b); box.append(r);
+  }
+}
 function toggleBookmark() {
   if (!cur) return;
   const b = bookmarkHere();
@@ -2837,9 +2898,10 @@ function toggleBookmark() {
     const rec = { ch: cur.id, p: Math.round(getP() * 1000) / 1000, label }, r = pageTextRange();
     if (r) { const t = r.ft.text; let s = r.s; while (s < r.e - 1 && /\s/.test(t[s])) s++; Object.assign(rec, { at: s, q: t.slice(s, s + 16), pre: t.slice(Math.max(0, s - 12), s), post: t.slice(s + 16, s + 28) }); }
     set("bm:" + Date.now().toString(36), rec);
-    toast("しおりをはさみました");
+    toast("しおりをはさみました(表紙と、下のつまみの上に印が出ます)");
+    const rb = document.getElementById("ribbon"); rb.classList.remove("drop"); void rb.offsetWidth; rb.classList.add("drop");
   }
-  updateRibbon();
+  updateRibbon(); renderBmTicks();
 }
 document.getElementById("r-bm").onclick = toggleBookmark;
 
